@@ -1,25 +1,69 @@
-// База данных мессенджера
+// ==================== БАЗА ДАННЫХ МЕССЕНДЖЕРА ====================
 class MessengerDB {
     constructor() {
+        this.storagePrefix = 'messenger_';
         this.initDB();
     }
     
+    // Универсальное хранилище с fallback на sessionStorage и memory
+    getStorage() {
+        // Пробуем использовать localStorage
+        try {
+            localStorage.setItem('storage_test', 'test');
+            localStorage.removeItem('storage_test');
+            return localStorage;
+        } catch (e) {
+            console.warn('localStorage недоступен, использую sessionStorage');
+            
+            // Пробуем sessionStorage
+            try {
+                sessionStorage.setItem('storage_test', 'test');
+                sessionStorage.removeItem('storage_test');
+                return sessionStorage;
+            } catch (e2) {
+                console.warn('sessionStorage недоступен, использую memoryStorage');
+                
+                // Создаем хранилище в памяти
+                if (!window.memoryStorage) {
+                    window.memoryStorage = {
+                        data: {},
+                        setItem: function(key, value) {
+                            this.data[key] = value;
+                        },
+                        getItem: function(key) {
+                            return this.data[key] || null;
+                        },
+                        removeItem: function(key) {
+                            delete this.data[key];
+                        },
+                        clear: function() {
+                            this.data = {};
+                        }
+                    };
+                }
+                return window.memoryStorage;
+            }
+        }
+    }
+    
     initDB() {
+        const storage = this.getStorage();
+        
         // Инициализация данных, если они еще не существуют
-        if (!localStorage.getItem('messenger_users')) {
-            localStorage.setItem('messenger_users', JSON.stringify([]));
+        if (!storage.getItem(this.storagePrefix + 'users')) {
+            storage.setItem(this.storagePrefix + 'users', JSON.stringify([]));
         }
         
-        if (!localStorage.getItem('messenger_friendships')) {
-            localStorage.setItem('messenger_friendships', JSON.stringify([]));
+        if (!storage.getItem(this.storagePrefix + 'friendships')) {
+            storage.setItem(this.storagePrefix + 'friendships', JSON.stringify([]));
         }
         
-        if (!localStorage.getItem('messenger_groups')) {
-            localStorage.setItem('messenger_groups', JSON.stringify([]));
+        if (!storage.getItem(this.storagePrefix + 'groups')) {
+            storage.setItem(this.storagePrefix + 'groups', JSON.stringify([]));
         }
         
-        if (!localStorage.getItem('messenger_messages')) {
-            localStorage.setItem('messenger_messages', JSON.stringify([]));
+        if (!storage.getItem(this.storagePrefix + 'messages')) {
+            storage.setItem(this.storagePrefix + 'messages', JSON.stringify([]));
         }
         
         // Создание демо-данных, если пользователей нет
@@ -30,11 +74,31 @@ class MessengerDB {
         const users = this.getUsers();
         if (users.length === 0) {
             const demoUsers = [
-                { id: this.generateId(), username: 'user1', password: 'pass123', createdAt: new Date().toISOString() },
-                { id: this.generateId(), username: 'user2', password: 'pass123', createdAt: new Date().toISOString() },
-                { id: this.generateId(), username: 'user3', password: 'pass123', createdAt: new Date().toISOString() }
+                { 
+                    id: this.generateId(), 
+                    username: 'user1', 
+                    password: 'pass123', 
+                    createdAt: new Date().toISOString(),
+                    avatar: '👤'
+                },
+                { 
+                    id: this.generateId(), 
+                    username: 'user2', 
+                    password: 'pass123', 
+                    createdAt: new Date().toISOString(),
+                    avatar: '👤'
+                },
+                { 
+                    id: this.generateId(), 
+                    username: 'user3', 
+                    password: 'pass123', 
+                    createdAt: new Date().toISOString(),
+                    avatar: '👤'
+                }
             ];
-            localStorage.setItem('messenger_users', JSON.stringify(demoUsers));
+            
+            const storage = this.getStorage();
+            storage.setItem(this.storagePrefix + 'users', JSON.stringify(demoUsers));
             
             // Добавляем друзей между демо-пользователями
             const friendships = [
@@ -42,7 +106,7 @@ class MessengerDB {
                 { id: this.generateId(), userId: demoUsers[0].id, friendId: demoUsers[2].id, accepted: true },
                 { id: this.generateId(), userId: demoUsers[1].id, friendId: demoUsers[2].id, accepted: true }
             ];
-            localStorage.setItem('messenger_friendships', JSON.stringify(friendships));
+            storage.setItem(this.storagePrefix + 'friendships', JSON.stringify(friendships));
             
             // Создаем демо-группу
             const demoGroup = {
@@ -50,9 +114,10 @@ class MessengerDB {
                 name: 'Демо группа',
                 creatorId: demoUsers[0].id,
                 members: [demoUsers[0].id, demoUsers[1].id, demoUsers[2].id],
-                createdAt: new Date().toISOString()
+                createdAt: new Date().toISOString(),
+                avatar: '👥'
             };
-            localStorage.setItem('messenger_groups', JSON.stringify([demoGroup]));
+            storage.setItem(this.storagePrefix + 'groups', JSON.stringify([demoGroup]));
             
             // Создаем демо-сообщения
             const demoMessages = [
@@ -93,7 +158,7 @@ class MessengerDB {
                     read: true
                 }
             ];
-            localStorage.setItem('messenger_messages', JSON.stringify(demoMessages));
+            storage.setItem(this.storagePrefix + 'messages', JSON.stringify(demoMessages));
         }
     }
     
@@ -103,7 +168,14 @@ class MessengerDB {
     
     // Методы для работы с пользователями
     getUsers() {
-        return JSON.parse(localStorage.getItem('messenger_users') || '[]');
+        const storage = this.getStorage();
+        const data = storage.getItem(this.storagePrefix + 'users');
+        try {
+            return JSON.parse(data || '[]');
+        } catch (e) {
+            console.error('Ошибка парсинга users:', e);
+            return [];
+        }
     }
     
     getUserById(id) {
@@ -128,11 +200,13 @@ class MessengerDB {
             id: this.generateId(),
             username,
             password,
-            createdAt: new Date().toISOString()
+            createdAt: new Date().toISOString(),
+            avatar: '👤'
         };
         
         users.push(newUser);
-        localStorage.setItem('messenger_users', JSON.stringify(users));
+        const storage = this.getStorage();
+        storage.setItem(this.storagePrefix + 'users', JSON.stringify(users));
         
         return { success: true, user: newUser };
     }
@@ -152,7 +226,14 @@ class MessengerDB {
     
     // Методы для работы с друзьями
     getFriendships() {
-        return JSON.parse(localStorage.getItem('messenger_friendships') || '[]');
+        const storage = this.getStorage();
+        const data = storage.getItem(this.storagePrefix + 'friendships');
+        try {
+            return JSON.parse(data || '[]');
+        } catch (e) {
+            console.error('Ошибка парсинга friendships:', e);
+            return [];
+        }
     }
     
     getFriends(userId) {
@@ -212,7 +293,8 @@ class MessengerDB {
                 } else {
                     // Принимаем запрос
                     existingFriendship.accepted = true;
-                    localStorage.setItem('messenger_friendships', JSON.stringify(friendships));
+                    const storage = this.getStorage();
+                    storage.setItem(this.storagePrefix + 'friendships', JSON.stringify(friendships));
                     return { success: true, message: 'Запрос в друзья принят' };
                 }
             }
@@ -227,14 +309,22 @@ class MessengerDB {
         };
         
         friendships.push(newFriendship);
-        localStorage.setItem('messenger_friendships', JSON.stringify(friendships));
+        const storage = this.getStorage();
+        storage.setItem(this.storagePrefix + 'friendships', JSON.stringify(friendships));
         
         return { success: true, message: 'Запрос в друзья отправлен' };
     }
     
     // Методы для работы с группами
     getGroups() {
-        return JSON.parse(localStorage.getItem('messenger_groups') || '[]');
+        const storage = this.getStorage();
+        const data = storage.getItem(this.storagePrefix + 'groups');
+        try {
+            return JSON.parse(data || '[]');
+        } catch (e) {
+            console.error('Ошибка парсинга groups:', e);
+            return [];
+        }
     }
     
     getGroupById(id) {
@@ -260,18 +350,27 @@ class MessengerDB {
             name,
             creatorId,
             members: [...new Set(memberIds)], // Убираем дубликаты
-            createdAt: new Date().toISOString()
+            createdAt: new Date().toISOString(),
+            avatar: '👥'
         };
         
         groups.push(newGroup);
-        localStorage.setItem('messenger_groups', JSON.stringify(groups));
+        const storage = this.getStorage();
+        storage.setItem(this.storagePrefix + 'groups', JSON.stringify(groups));
         
         return { success: true, group: newGroup };
     }
     
     // Методы для работы с сообщениями
     getMessages() {
-        return JSON.parse(localStorage.getItem('messenger_messages') || '[]');
+        const storage = this.getStorage();
+        const data = storage.getItem(this.storagePrefix + 'messages');
+        try {
+            return JSON.parse(data || '[]');
+        } catch (e) {
+            console.error('Ошибка парсинга messages:', e);
+            return [];
+        }
     }
     
     getPrivateMessages(user1Id, user2Id) {
@@ -302,7 +401,8 @@ class MessengerDB {
         };
         
         messages.push(newMessage);
-        localStorage.setItem('messenger_messages', JSON.stringify(messages));
+        const storage = this.getStorage();
+        storage.setItem(this.storagePrefix + 'messages', JSON.stringify(messages));
         
         return newMessage;
     }
@@ -329,11 +429,13 @@ class MessengerDB {
                 return { success: false, message: 'Неправильный формат данных' };
             }
             
+            const storage = this.getStorage();
+            
             // Импортируем данные
-            localStorage.setItem('messenger_users', JSON.stringify(data.users));
-            localStorage.setItem('messenger_friendships', JSON.stringify(data.friendships));
-            localStorage.setItem('messenger_groups', JSON.stringify(data.groups));
-            localStorage.setItem('messenger_messages', JSON.stringify(data.messages));
+            storage.setItem(this.storagePrefix + 'users', JSON.stringify(data.users));
+            storage.setItem(this.storagePrefix + 'friendships', JSON.stringify(data.friendships));
+            storage.setItem(this.storagePrefix + 'groups', JSON.stringify(data.groups));
+            storage.setItem(this.storagePrefix + 'messages', JSON.stringify(data.messages));
             
             return { success: true, message: 'Данные успешно импортированы' };
         } catch (error) {
@@ -342,7 +444,7 @@ class MessengerDB {
     }
 }
 
-// Основной класс приложения
+// ==================== ОСНОВНОЙ КЛАСС ПРИЛОЖЕНИЯ ====================
 class MessengerApp {
     constructor() {
         this.db = new MessengerDB();
@@ -354,13 +456,14 @@ class MessengerApp {
     
     init() {
         // Проверяем, авторизован ли пользователь
-        const savedUser = localStorage.getItem('messenger_currentUser');
+        const storage = this.db.getStorage();
+        const savedUser = storage.getItem('messenger_currentUser');
         if (savedUser) {
             try {
                 this.currentUser = JSON.parse(savedUser);
                 this.showMainScreen();
             } catch (e) {
-                localStorage.removeItem('messenger_currentUser');
+                storage.removeItem('messenger_currentUser');
                 this.showAuthScreen();
             }
         } else {
@@ -369,6 +472,31 @@ class MessengerApp {
         
         this.setupEventListeners();
         this.setupModals();
+        
+        // Тестируем хранилище
+        this.testStorage();
+    }
+    
+    testStorage() {
+        console.log('Тестирование хранилища...');
+        const storage = this.db.getStorage();
+        console.log('Тип хранилища:', storage === localStorage ? 'localStorage' : 
+                   storage === sessionStorage ? 'sessionStorage' : 'memoryStorage');
+        
+        // Проверяем доступность
+        try {
+            storage.setItem('test_key', 'test_value');
+            const value = storage.getItem('test_key');
+            storage.removeItem('test_key');
+            
+            if (value === 'test_value') {
+                console.log('✓ Хранилище работает корректно');
+            } else {
+                console.warn('⚠ Хранилище может работать некорректно');
+            }
+        } catch (error) {
+            console.error('✗ Ошибка хранилища:', error);
+        }
     }
     
     showAuthScreen() {
@@ -387,6 +515,12 @@ class MessengerApp {
         this.loadFriends();
         this.loadGroups();
         this.loadChats();
+        
+        // Показываем информацию о хранилище
+        const storage = this.db.getStorage();
+        if (storage === window.memoryStorage) {
+            this.showNotification('⚠ Внимание: данные хранятся только в памяти и будут потеряны при перезагрузке страницы', 'warning');
+        }
     }
     
     setupEventListeners() {
@@ -428,6 +562,14 @@ class MessengerApp {
         document.getElementById('close-info-btn').addEventListener('click', () => {
             document.getElementById('info-panel').classList.add('hidden');
         });
+        
+        // Экспорт/импорт данных
+        const exportImportBtn = document.createElement('button');
+        exportImportBtn.className = 'btn-icon';
+        exportImportBtn.title = 'Экспорт/импорт данных';
+        exportImportBtn.innerHTML = '<i class="fas fa-database"></i>';
+        exportImportBtn.addEventListener('click', () => this.showExportImportModal());
+        document.querySelector('.sidebar-header').appendChild(exportImportBtn);
     }
     
     setupModals() {
@@ -452,6 +594,15 @@ class MessengerApp {
             btn.addEventListener('click', (e) => {
                 const modal = e.target.closest('.modal');
                 if (modal) {
+                    modal.classList.add('hidden');
+                }
+            });
+        });
+        
+        // Закрытие модальных окон при клике вне их
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
                     modal.classList.add('hidden');
                 }
             });
@@ -499,7 +650,8 @@ class MessengerApp {
         
         if (result.success) {
             this.currentUser = result.user;
-            localStorage.setItem('messenger_currentUser', JSON.stringify(this.currentUser));
+            const storage = this.db.getStorage();
+            storage.setItem('messenger_currentUser', JSON.stringify(this.currentUser));
             this.showMainScreen();
             this.showNotification('Успешный вход!');
         } else {
@@ -532,7 +684,8 @@ class MessengerApp {
         
         if (result.success) {
             this.currentUser = result.user;
-            localStorage.setItem('messenger_currentUser', JSON.stringify(this.currentUser));
+            const storage = this.db.getStorage();
+            storage.setItem('messenger_currentUser', JSON.stringify(this.currentUser));
             this.showMainScreen();
             this.showNotification('Регистрация успешна!');
         } else {
@@ -543,7 +696,8 @@ class MessengerApp {
     logout() {
         this.currentUser = null;
         this.currentChat = null;
-        localStorage.removeItem('messenger_currentUser');
+        const storage = this.db.getStorage();
+        storage.removeItem('messenger_currentUser');
         this.showAuthScreen();
         this.showNotification('Вы вышли из системы');
     }
@@ -583,15 +737,19 @@ class MessengerApp {
         const membersList = document.getElementById('group-members-list');
         membersList.innerHTML = '';
         
-        friends.forEach(friend => {
-            const checkbox = document.createElement('div');
-            checkbox.className = 'checkbox-item';
-            checkbox.innerHTML = `
-                <input type="checkbox" id="member-${friend.id}" value="${friend.id}">
-                <label for="member-${friend.id}">${friend.username}</label>
-            `;
-            membersList.appendChild(checkbox);
-        });
+        if (friends.length === 0) {
+            membersList.innerHTML = '<p>У вас пока нет друзей для создания группы</p>';
+        } else {
+            friends.forEach(friend => {
+                const checkbox = document.createElement('div');
+                checkbox.className = 'checkbox-item';
+                checkbox.innerHTML = `
+                    <input type="checkbox" id="member-${friend.id}" value="${friend.id}">
+                    <label for="member-${friend.id}">${friend.username}</label>
+                `;
+                membersList.appendChild(checkbox);
+            });
+        }
         
         this.openModal('create-group-modal');
     }
@@ -671,7 +829,7 @@ class MessengerApp {
         const container = document.getElementById('friends-container');
         
         if (friends.length === 0) {
-            container.innerHTML = '<div class="contact-item"><p>У вас пока нет друзей</p></div>';
+            container.innerHTML = '<div class="contact-item"><p>У вас пока нет друзей. Добавьте друзей через кнопку "+"</p></div>';
             return;
         }
         
@@ -703,7 +861,7 @@ class MessengerApp {
         const container = document.getElementById('groups-container');
         
         if (groups.length === 0) {
-            container.innerHTML = '<div class="contact-item"><p>У вас пока нет групп</p></div>';
+            container.innerHTML = '<div class="contact-item"><p>У вас пока нет групп. Создайте группу через кнопку "+"</p></div>';
             return;
         }
         
@@ -736,7 +894,7 @@ class MessengerApp {
         const container = document.getElementById('chats-container');
         
         if (friends.length === 0 && groups.length === 0) {
-            container.innerHTML = '<div class="contact-item"><p>У вас пока нет чатов</p></div>';
+            container.innerHTML = '<div class="contact-item"><p>У вас пока нет чатов. Начните новый чат!</p></div>';
             return;
         }
         
@@ -757,7 +915,7 @@ class MessengerApp {
                 </div>
                 <div class="contact-info">
                     <h4>${friend.username}</h4>
-                    <p>${lastMessage ? (lastMessage.senderId === this.currentUser.id ? 'Вы: ' : '') + lastMessage.text.substring(0, 20) + (lastMessage.text.length > 20 ? '...' : '') : 'Нет сообщений'}</p>
+                    <p>${lastMessage ? (lastMessage.senderId === this.currentUser.id ? 'Вы: ' : '') + this.truncateText(lastMessage.text, 20) : 'Нет сообщений'}</p>
                 </div>
                 <div class="contact-meta">
                     ${lastMessage ? this.formatTime(lastMessage.timestamp) : ''}
@@ -787,7 +945,7 @@ class MessengerApp {
                 </div>
                 <div class="contact-info">
                     <h4>${group.name}</h4>
-                    <p>${lastMessage ? (lastSender ? lastSender.username + ': ' : '') + lastMessage.text.substring(0, 20) + (lastMessage.text.length > 20 ? '...' : '') : 'Нет сообщений'}</p>
+                    <p>${lastMessage ? (lastSender ? lastSender.username + ': ' : '') + this.truncateText(lastMessage.text, 20) : 'Нет сообщений'}</p>
                 </div>
                 <div class="contact-meta">
                     ${lastMessage ? this.formatTime(lastMessage.timestamp) : ''}
@@ -835,6 +993,11 @@ class MessengerApp {
         
         // Показываем активный чат в списке
         this.highlightActiveChat();
+        
+        // Фокусируемся на поле ввода
+        setTimeout(() => {
+            document.getElementById('message-input').focus();
+        }, 100);
     }
     
     loadMessages() {
@@ -869,7 +1032,7 @@ class MessengerApp {
             
             messageElement.innerHTML = `
                 ${senderName}
-                <div class="message-bubble">${message.text}</div>
+                <div class="message-bubble">${this.escapeHtml(message.text)}</div>
                 <div class="message-info">${this.formatTime(message.timestamp)}</div>
             `;
             
@@ -924,6 +1087,49 @@ class MessengerApp {
         }
     }
     
+    showExportImportModal() {
+        document.getElementById('export-data').value = '';
+        document.getElementById('import-data').value = '';
+        document.getElementById('import-error').textContent = '';
+        this.openModal('export-import-modal');
+    }
+    
+    exportData() {
+        const data = this.db.exportData();
+        document.getElementById('export-data').value = data;
+        this.showNotification('Данные экспортированы в поле выше');
+    }
+    
+    importData() {
+        const data = document.getElementById('import-data').value.trim();
+        const errorElement = document.getElementById('import-error');
+        
+        if (!data) {
+            errorElement.textContent = 'Введите данные для импорта';
+            return;
+        }
+        
+        const result = this.db.importData(data);
+        
+        if (result.success) {
+            errorElement.textContent = '';
+            this.closeModal('export-import-modal');
+            this.showNotification(result.message);
+            
+            // Обновляем данные на экране
+            this.loadFriends();
+            this.loadGroups();
+            this.loadChats();
+            
+            // Если открыт чат, обновляем сообщения
+            if (this.currentChat) {
+                this.loadMessages();
+            }
+        } else {
+            errorElement.textContent = result.message;
+        }
+    }
+    
     openModal(modalId) {
         document.getElementById(modalId).classList.remove('hidden');
     }
@@ -966,44 +1172,107 @@ class MessengerApp {
         }
     }
     
-    exportData() {
-        const data = this.db.exportData();
-        document.getElementById('export-data').value = data;
-        this.showNotification('Данные экспортированы');
+    truncateText(text, maxLength) {
+        if (text.length <= maxLength) return text;
+        return text.substring(0, maxLength) + '...';
     }
     
-    importData() {
-        const data = document.getElementById('import-data').value.trim();
-        const errorElement = document.getElementById('import-error');
-        
-        if (!data) {
-            errorElement.textContent = 'Введите данные для импорта';
-            return;
-        }
-        
-        const result = this.db.importData(data);
-        
-        if (result.success) {
-            errorElement.textContent = '';
-            this.closeModal('export-import-modal');
-            this.showNotification(result.message);
-            
-            // Обновляем данные на экране
-            this.loadFriends();
-            this.loadGroups();
-            this.loadChats();
-            
-            // Если открыт чат, обновляем сообщения
-            if (this.currentChat) {
-                this.loadMessages();
-            }
-        } else {
-            errorElement.textContent = result.message;
-        }
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 }
 
-// Инициализация приложения после загрузки страницы
-document.addEventListener('DOMContentLoaded', () => {
-    new MessengerApp();
+// ==================== ИНИЦИАЛИЗАЦИЯ ПРИЛОЖЕНИЯ ====================
+// Инициализация после загрузки страницы
+document.addEventListener('DOMContentLoaded', function() {
+    // Проверяем, на GitHub Pages ли мы
+    if (window.location.host.includes('github.io')) {
+        console.log('Приложение запущено на GitHub Pages');
+        
+        // Добавляем информацию о хранилище
+        const checkStorage = () => {
+            try {
+                localStorage.setItem('github_test', 'test');
+                const result = localStorage.getItem('github_test') === 'test';
+                localStorage.removeItem('github_test');
+                
+                if (!result) {
+                    console.warn('localStorage может быть ограничен на GitHub Pages');
+                }
+            } catch (e) {
+                console.error('GitHub Pages: localStorage недоступен');
+            }
+        };
+        
+        checkStorage();
+    }
+    
+    // Инициализируем приложение
+    window.app = new MessengerApp();
 });
+
+// ==================== ДОПОЛНИТЕЛЬНЫЕ ФУНКЦИИ ДЛЯ GITHUB PAGES ====================
+// Обработка 404 ошибок на GitHub Pages для SPA
+(function() {
+    // Сохраняем текущий URL перед перезагрузкой
+    if (sessionStorage.redirect) {
+        const redirect = sessionStorage.redirect;
+        delete sessionStorage.redirect;
+        
+        if (redirect !== window.location.href) {
+            window.history.replaceState(null, null, redirect);
+        }
+    }
+    
+    // Перехватываем клики по ссылкам
+    document.addEventListener('click', function(e) {
+        if (e.target.tagName === 'A' && e.target.getAttribute('href') && 
+            e.target.getAttribute('href').startsWith('/')) {
+            e.preventDefault();
+            const href = e.target.getAttribute('href');
+            window.history.pushState(null, null, href);
+            // Здесь можно добавить логику маршрутизации для SPA
+        }
+    });
+    
+    // Обработка кнопок браузера "назад"/"вперед"
+    window.addEventListener('popstate', function() {
+        // Можно добавить логику обновления интерфейса при навигации
+        console.log('Location changed to:', window.location.pathname);
+    });
+})();
+
+// Функция для сброса базы данных (для отладки)
+window.resetDatabase = function() {
+    if (confirm('Вы уверены, что хотите сбросить все данные?')) {
+        const storage = localStorage;
+        storage.removeItem('messenger_users');
+        storage.removeItem('messenger_friendships');
+        storage.removeItem('messenger_groups');
+        storage.removeItem('messenger_messages');
+        storage.removeItem('messenger_currentUser');
+        
+        if (window.app) {
+            window.app.showAuthScreen();
+        }
+        
+        location.reload();
+    }
+};
+
+// Функция для просмотра состояния базы данных
+window.showDatabaseStatus = function() {
+    const storage = localStorage;
+    const keys = ['messenger_users', 'messenger_friendships', 'messenger_groups', 'messenger_messages'];
+    
+    console.log('=== Статус базы данных ===');
+    keys.forEach(key => {
+        const data = storage.getItem(key);
+        console.log(`${key}:`, data ? JSON.parse(data).length + ' элементов' : 'нет данных');
+    });
+    
+    const users = JSON.parse(storage.getItem('messenger_users') || '[]');
+    console.log('Пользователи:', users.map(u => u.username).join(', '));
+};
