@@ -1,114 +1,106 @@
-// База данных мессенджера
-class MessengerDB {
+// ==================== ПРОСТАЯ БАЗА ДАННЫХ С ЭКСПОРТОМ ====================
+class SimpleDB {
     constructor() {
         this.initDB();
     }
     
     initDB() {
-        // Инициализация данных, если они еще не существуют
-        if (!localStorage.getItem('messenger_users')) {
-            localStorage.setItem('messenger_users', JSON.stringify([]));
+        // Создаем демо-данные при первом запуске
+        if (!localStorage.getItem('messenger_data')) {
+            this.createDemoData();
         }
-        
-        if (!localStorage.getItem('messenger_friendships')) {
-            localStorage.setItem('messenger_friendships', JSON.stringify([]));
-        }
-        
-        if (!localStorage.getItem('messenger_groups')) {
-            localStorage.setItem('messenger_groups', JSON.stringify([]));
-        }
-        
-        if (!localStorage.getItem('messenger_messages')) {
-            localStorage.setItem('messenger_messages', JSON.stringify([]));
-        }
-        
-        // Создание демо-данных, если пользователей нет
-        this.createDemoData();
     }
     
     createDemoData() {
-        const users = this.getUsers();
-        if (users.length === 0) {
-            const demoUsers = [
-                { id: this.generateId(), username: 'user1', password: 'pass123', createdAt: new Date().toISOString() },
-                { id: this.generateId(), username: 'user2', password: 'pass123', createdAt: new Date().toISOString() },
-                { id: this.generateId(), username: 'user3', password: 'pass123', createdAt: new Date().toISOString() }
-            ];
-            localStorage.setItem('messenger_users', JSON.stringify(demoUsers));
-            
-            // Добавляем друзей между демо-пользователями
-            const friendships = [
-                { id: this.generateId(), userId: demoUsers[0].id, friendId: demoUsers[1].id, accepted: true },
-                { id: this.generateId(), userId: demoUsers[0].id, friendId: demoUsers[2].id, accepted: true },
-                { id: this.generateId(), userId: demoUsers[1].id, friendId: demoUsers[2].id, accepted: true }
-            ];
-            localStorage.setItem('messenger_friendships', JSON.stringify(friendships));
-            
-            // Создаем демо-группу
-            const demoGroup = {
-                id: this.generateId(),
-                name: 'Демо группа',
-                creatorId: demoUsers[0].id,
-                members: [demoUsers[0].id, demoUsers[1].id, demoUsers[2].id],
-                createdAt: new Date().toISOString()
-            };
-            localStorage.setItem('messenger_groups', JSON.stringify([demoGroup]));
-            
-            // Создаем демо-сообщения
-            const demoMessages = [
+        const demoData = {
+            users: [
+                { 
+                    id: 'user1',
+                    username: 'user1', 
+                    password: 'pass123',
+                    createdAt: new Date().toISOString()
+                },
+                { 
+                    id: 'user2',
+                    username: 'user2', 
+                    password: 'pass123',
+                    createdAt: new Date().toISOString()
+                },
+                { 
+                    id: 'user3',
+                    username: 'user3', 
+                    password: 'pass123',
+                    createdAt: new Date().toISOString()
+                }
+            ],
+            friendships: [
+                { id: 'f1', userId: 'user1', friendId: 'user2', accepted: true },
+                { id: 'f2', userId: 'user1', friendId: 'user3', accepted: true },
+                { id: 'f3', userId: 'user2', friendId: 'user3', accepted: true }
+            ],
+            groups: [
                 {
-                    id: this.generateId(),
-                    senderId: demoUsers[0].id,
-                    receiverId: demoUsers[1].id,
+                    id: 'group1',
+                    name: 'Демо группа',
+                    creatorId: 'user1',
+                    members: ['user1', 'user2', 'user3'],
+                    createdAt: new Date().toISOString()
+                }
+            ],
+            messages: [
+                {
+                    id: 'msg1',
+                    senderId: 'user1',
+                    receiverId: 'user2',
                     groupId: null,
                     text: 'Привет! Как дела?',
-                    timestamp: new Date(Date.now() - 3600000).toISOString(),
-                    read: true
+                    timestamp: new Date(Date.now() - 3600000).toISOString()
                 },
                 {
-                    id: this.generateId(),
-                    senderId: demoUsers[1].id,
-                    receiverId: demoUsers[0].id,
+                    id: 'msg2',
+                    senderId: 'user2',
+                    receiverId: 'user1',
                     groupId: null,
                     text: 'Привет! Все отлично, спасибо!',
-                    timestamp: new Date(Date.now() - 3000000).toISOString(),
-                    read: true
-                },
-                {
-                    id: this.generateId(),
-                    senderId: demoUsers[0].id,
-                    receiverId: null,
-                    groupId: demoGroup.id,
-                    text: 'Всем привет в нашей демо-группе!',
-                    timestamp: new Date(Date.now() - 2400000).toISOString(),
-                    read: true
-                },
-                {
-                    id: this.generateId(),
-                    senderId: demoUsers[2].id,
-                    receiverId: null,
-                    groupId: demoGroup.id,
-                    text: 'Привет всем!',
-                    timestamp: new Date(Date.now() - 1800000).toISOString(),
-                    read: true
+                    timestamp: new Date(Date.now() - 3000000).toISOString()
                 }
-            ];
-            localStorage.setItem('messenger_messages', JSON.stringify(demoMessages));
+            ]
+        };
+        
+        this.saveAllData(demoData);
+    }
+    
+    // ==================== МЕТОДЫ ДЛЯ РАБОТЫ С ДАННЫМИ ====================
+    
+    getAllData() {
+        const data = localStorage.getItem('messenger_data');
+        if (data) {
+            try {
+                return JSON.parse(data);
+            } catch (e) {
+                console.error('Ошибка парсинга данных:', e);
+                return this.getEmptyData();
+            }
         }
+        return this.getEmptyData();
     }
     
-    generateId() {
-        return Date.now().toString(36) + Math.random().toString(36).substr(2);
+    getEmptyData() {
+        return {
+            users: [],
+            friendships: [],
+            groups: [],
+            messages: []
+        };
     }
     
-    // Методы для работы с пользователями
+    saveAllData(data) {
+        localStorage.setItem('messenger_data', JSON.stringify(data));
+    }
+    
+    // Пользователи
     getUsers() {
-        return JSON.parse(localStorage.getItem('messenger_users') || '[]');
-    }
-    
-    getUserById(id) {
-        const users = this.getUsers();
-        return users.find(user => user.id === id);
+        return this.getAllData().users;
     }
     
     getUserByUsername(username) {
@@ -116,23 +108,29 @@ class MessengerDB {
         return users.find(user => user.username === username);
     }
     
-    addUser(username, password) {
+    getUserById(id) {
         const users = this.getUsers();
+        return users.find(user => user.id === id);
+    }
+    
+    addUser(username, password) {
+        const data = this.getAllData();
+        const users = data.users;
         
-        // Проверяем, существует ли пользователь с таким именем
         if (users.some(user => user.username === username)) {
-            return { success: false, message: 'Пользователь с таким именем уже существует' };
+            return { success: false, message: 'Пользователь уже существует' };
         }
         
         const newUser = {
-            id: this.generateId(),
+            id: 'user_' + Date.now(),
             username,
             password,
             createdAt: new Date().toISOString()
         };
         
         users.push(newUser);
-        localStorage.setItem('messenger_users', JSON.stringify(users));
+        data.users = users;
+        this.saveAllData(data);
         
         return { success: true, user: newUser };
     }
@@ -150,91 +148,71 @@ class MessengerDB {
         return { success: true, user };
     }
     
-    // Методы для работы с друзьями
+    // Друзья
     getFriendships() {
-        return JSON.parse(localStorage.getItem('messenger_friendships') || '[]');
+        return this.getAllData().friendships;
     }
     
     getFriends(userId) {
         const friendships = this.getFriendships();
         const users = this.getUsers();
         
-        // Получаем ID друзей пользователя (принятые запросы)
         const friendIds = friendships
             .filter(f => (f.userId === userId || f.friendId === userId) && f.accepted)
             .map(f => f.userId === userId ? f.friendId : f.friendId === userId ? f.userId : null)
             .filter(id => id !== null);
         
-        // Получаем объекты пользователей-друзей
         return friendIds.map(id => users.find(user => user.id === id)).filter(user => user);
-    }
-    
-    getFriendRequests(userId) {
-        const friendships = this.getFriendships();
-        const users = this.getUsers();
-        
-        // Получаем входящие запросы в друзья
-        const incomingRequests = friendships
-            .filter(f => f.friendId === userId && !f.accepted)
-            .map(f => {
-                const user = users.find(u => u.id === f.userId);
-                return { ...f, friendUsername: user ? user.username : 'Неизвестный пользователь' };
-            });
-        
-        return incomingRequests;
     }
     
     addFriend(userId, friendUsername) {
         const friendUser = this.getUserByUsername(friendUsername);
         
         if (!friendUser) {
-            return { success: false, message: 'Пользователь с таким именем не найден' };
+            return { success: false, message: 'Пользователь не найден' };
         }
         
         if (friendUser.id === userId) {
-            return { success: false, message: 'Вы не можете добавить себя в друзья' };
+            return { success: false, message: 'Нельзя добавить себя' };
         }
         
-        const friendships = this.getFriendships();
+        const data = this.getAllData();
+        const friendships = data.friendships;
         
-        // Проверяем, существует ли уже такая дружба или запрос
-        const existingFriendship = friendships.find(f => 
+        const existing = friendships.find(f => 
             (f.userId === userId && f.friendId === friendUser.id) || 
             (f.userId === friendUser.id && f.friendId === userId)
         );
         
-        if (existingFriendship) {
-            if (existingFriendship.accepted) {
-                return { success: false, message: 'Этот пользователь уже у вас в друзьях' };
-            } else {
-                if (existingFriendship.userId === userId) {
-                    return { success: false, message: 'Вы уже отправили запрос этому пользователю' };
-                } else {
-                    // Принимаем запрос
-                    existingFriendship.accepted = true;
-                    localStorage.setItem('messenger_friendships', JSON.stringify(friendships));
-                    return { success: true, message: 'Запрос в друзья принят' };
-                }
+        if (existing) {
+            if (existing.accepted) {
+                return { success: false, message: 'Уже в друзьях' };
             }
+            if (existing.userId === userId) {
+                return { success: false, message: 'Запрос уже отправлен' };
+            }
+            // Принимаем запрос
+            existing.accepted = true;
+            data.friendships = friendships;
+            this.saveAllData(data);
+            return { success: true, message: 'Запрос принят' };
         }
         
-        // Создаем новый запрос в друзья
-        const newFriendship = {
-            id: this.generateId(),
+        friendships.push({
+            id: 'f_' + Date.now(),
             userId,
             friendId: friendUser.id,
             accepted: false
-        };
+        });
         
-        friendships.push(newFriendship);
-        localStorage.setItem('messenger_friendships', JSON.stringify(friendships));
-        
-        return { success: true, message: 'Запрос в друзья отправлен' };
+        data.friendships = friendships;
+        this.saveAllData(data);
+        return { success: true, message: 'Запрос отправлен' };
     }
     
-    // Методы для работы с группами
+    // Группы
     getGroups() {
-        return JSON.parse(localStorage.getItem('messenger_groups') || '[]');
+        return this.getAllData().groups;
     }
     
     getGroupById(id) {
@@ -248,30 +226,31 @@ class MessengerDB {
     }
     
     createGroup(name, creatorId, memberIds) {
-        const groups = this.getGroups();
-        
-        // Убедимся, что создатель включен в участники
         if (!memberIds.includes(creatorId)) {
             memberIds.push(creatorId);
         }
         
+        const data = this.getAllData();
+        const groups = data.groups;
+        
         const newGroup = {
-            id: this.generateId(),
+            id: 'group_' + Date.now(),
             name,
             creatorId,
-            members: [...new Set(memberIds)], // Убираем дубликаты
+            members: memberIds,
             createdAt: new Date().toISOString()
         };
         
         groups.push(newGroup);
-        localStorage.setItem('messenger_groups', JSON.stringify(groups));
+        data.groups = groups;
+        this.saveAllData(data);
         
         return { success: true, group: newGroup };
     }
     
-    // Методы для работы с сообщениями
+    // Сообщения
     getMessages() {
-        return JSON.parse(localStorage.getItem('messenger_messages') || '[]');
+        return this.getAllData().messages;
     }
     
     getPrivateMessages(user1Id, user2Id) {
@@ -289,34 +268,29 @@ class MessengerDB {
     }
     
     addMessage(senderId, receiverId, groupId, text) {
-        const messages = this.getMessages();
+        const data = this.getAllData();
+        const messages = data.messages;
         
         const newMessage = {
-            id: this.generateId(),
+            id: 'msg_' + Date.now(),
             senderId,
             receiverId: groupId ? null : receiverId,
             groupId: groupId || null,
             text,
-            timestamp: new Date().toISOString(),
-            read: false
+            timestamp: new Date().toISOString()
         };
         
         messages.push(newMessage);
-        localStorage.setItem('messenger_messages', JSON.stringify(messages));
+        data.messages = messages;
+        this.saveAllData(data);
         
         return newMessage;
     }
     
-    // Экспорт и импорт данных
+    // ==================== ЭКСПОРТ/ИМПОРТ ДАННЫХ ====================
+    
     exportData() {
-        const data = {
-            users: this.getUsers(),
-            friendships: this.getFriendships(),
-            groups: this.getGroups(),
-            messages: this.getMessages(),
-            exportedAt: new Date().toISOString()
-        };
-        
+        const data = this.getAllData();
         return JSON.stringify(data, null, 2);
     }
     
@@ -324,36 +298,65 @@ class MessengerDB {
         try {
             const data = JSON.parse(jsonString);
             
-            // Проверяем структуру данных
+            // Проверяем структуру
             if (!data.users || !data.friendships || !data.groups || !data.messages) {
                 return { success: false, message: 'Неправильный формат данных' };
             }
             
-            // Импортируем данные
-            localStorage.setItem('messenger_users', JSON.stringify(data.users));
-            localStorage.setItem('messenger_friendships', JSON.stringify(data.friendships));
-            localStorage.setItem('messenger_groups', JSON.stringify(data.groups));
-            localStorage.setItem('messenger_messages', JSON.stringify(data.messages));
+            // Сохраняем данные
+            this.saveAllData(data);
             
-            return { success: true, message: 'Данные успешно импортированы' };
+            return { success: true, message: 'Данные успешно импортированы!' };
         } catch (error) {
-            return { success: false, message: 'Ошибка при импорте данных: ' + error.message };
+            return { success: false, message: 'Ошибка при импорте: ' + error.message };
         }
+    }
+    
+    // Экспорт данных в файл (скачивание)
+    exportToFile() {
+        const data = this.exportData();
+        const blob = new Blob([data], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'messenger_backup_' + new Date().toISOString().split('T')[0] + '.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        
+        URL.revokeObjectURL(url);
+        
+        return 'Данные экспортированы в файл!';
+    }
+    
+    // Импорт из файла
+    importFromFile(file) {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const result = this.importData(e.target.result);
+                resolve(result);
+            };
+            reader.onerror = () => {
+                resolve({ success: false, message: 'Ошибка чтения файла' });
+            };
+            reader.readAsText(file);
+        });
     }
 }
 
-// Основной класс приложения
+// ==================== ОСНОВНОЕ ПРИЛОЖЕНИЕ ====================
 class MessengerApp {
     constructor() {
-        this.db = new MessengerDB();
+        this.db = new SimpleDB();
         this.currentUser = null;
-        this.currentChat = null; // { type: 'private'|'group', id: userId/groupId }
+        this.currentChat = null;
         
         this.init();
     }
     
     init() {
-        // Проверяем, авторизован ли пользователь
         const savedUser = localStorage.getItem('messenger_currentUser');
         if (savedUser) {
             try {
@@ -380,10 +383,8 @@ class MessengerApp {
         document.getElementById('auth-screen').classList.add('hidden');
         document.getElementById('main-screen').classList.remove('hidden');
         
-        // Обновляем информацию о текущем пользователе
         document.getElementById('current-username').textContent = this.currentUser.username;
         
-        // Загружаем данные
         this.loadFriends();
         this.loadGroups();
         this.loadChats();
@@ -395,7 +396,7 @@ class MessengerApp {
         document.getElementById('register-btn').addEventListener('click', () => this.register());
         document.getElementById('logout-btn').addEventListener('click', () => this.logout());
         
-        // Переключение между вкладками авторизации
+        // Вкладки авторизации
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const tab = e.target.dataset.tab;
@@ -403,7 +404,7 @@ class MessengerApp {
             });
         });
         
-        // Переключение между вкладками в боковой панели
+        // Вкладки боковой панели
         document.querySelectorAll('.sidebar-tab').forEach(tab => {
             tab.addEventListener('click', (e) => {
                 const tabName = e.target.closest('.sidebar-tab').dataset.tab;
@@ -416,7 +417,7 @@ class MessengerApp {
         document.getElementById('create-group-btn').addEventListener('click', () => this.showCreateGroupModal());
         document.getElementById('new-chat-btn').addEventListener('click', () => this.showNewChatModal());
         
-        // Отправка сообщения
+        // Отправка сообщений
         document.getElementById('send-message-btn').addEventListener('click', () => this.sendMessage());
         document.getElementById('message-input').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
@@ -424,28 +425,35 @@ class MessengerApp {
             }
         });
         
-        // Закрытие панели информации
-        document.getElementById('close-info-btn').addEventListener('click', () => {
-            document.getElementById('info-panel').classList.add('hidden');
-        });
+        // Кнопка экспорта данных
+        const exportBtn = document.createElement('button');
+        exportBtn.className = 'btn-icon';
+        exportBtn.title = 'Экспорт данных';
+        exportBtn.innerHTML = '<i class="fas fa-download"></i>';
+        exportBtn.addEventListener('click', () => this.showExportModal());
+        document.querySelector('.sidebar-header').appendChild(exportBtn);
+        
+        // Кнопка импорта данных
+        const importBtn = document.createElement('button');
+        importBtn.className = 'btn-icon';
+        importBtn.title = 'Импорт данных';
+        importBtn.innerHTML = '<i class="fas fa-upload"></i>';
+        importBtn.addEventListener('click', () => this.showImportModal());
+        document.querySelector('.sidebar-header').appendChild(importBtn);
     }
     
     setupModals() {
-        // Модальное окно добавления друга
+        // Добавление друга
         document.getElementById('confirm-add-friend').addEventListener('click', () => this.addFriend());
         document.getElementById('cancel-add-friend').addEventListener('click', () => this.closeModal('add-friend-modal'));
         
-        // Модальное окно создания группы
+        // Создание группы
         document.getElementById('confirm-create-group').addEventListener('click', () => this.createGroup());
         document.getElementById('cancel-create-group').addEventListener('click', () => this.closeModal('create-group-modal'));
         
-        // Модальное окно нового чата
+        // Новый чат
         document.getElementById('confirm-new-chat').addEventListener('click', () => this.startNewChat());
         document.getElementById('cancel-new-chat').addEventListener('click', () => this.closeModal('new-chat-modal'));
-        
-        // Экспорт/импорт данных
-        document.getElementById('export-btn').addEventListener('click', () => this.exportData());
-        document.getElementById('import-btn').addEventListener('click', () => this.importData());
         
         // Закрытие модальных окон
         document.querySelectorAll('.close-modal').forEach(btn => {
@@ -458,28 +466,180 @@ class MessengerApp {
         });
     }
     
+    showExportModal() {
+        const data = this.db.exportData();
+        
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Экспорт данных</h3>
+                    <button class="btn-icon close-modal">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <p>Скопируйте этот код и сохраните его. Используйте для переноса данных на другое устройство.</p>
+                    <textarea id="export-data" readonly style="width: 100%; height: 200px; margin: 10px 0; padding: 10px; font-family: monospace;">${data}</textarea>
+                    <button id="copy-btn" class="btn btn-primary">Копировать в буфер</button>
+                    <button id="download-btn" class="btn btn-secondary" style="margin-left: 10px;">Скачать файл</button>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn close-modal">Закрыть</button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        // Копирование в буфер
+        modal.querySelector('#copy-btn').addEventListener('click', () => {
+            const textarea = modal.querySelector('#export-data');
+            textarea.select();
+            document.execCommand('copy');
+            this.showNotification('Данные скопированы в буфер!');
+        });
+        
+        // Скачивание файла
+        modal.querySelector('#download-btn').addEventListener('click', () => {
+            const result = this.db.exportToFile();
+            this.showNotification(result);
+        });
+        
+        // Закрытие модального окна
+        modal.querySelector('.close-modal').addEventListener('click', () => {
+            document.body.removeChild(modal);
+        });
+        
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                document.body.removeChild(modal);
+            }
+        });
+    }
+    
+    showImportModal() {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Импорт данных</h3>
+                    <button class="btn-icon close-modal">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <p>Вставьте код с экспортированными данными или выберите файл:</p>
+                    <textarea id="import-data" placeholder="Вставьте JSON код здесь..." style="width: 100%; height: 150px; margin: 10px 0; padding: 10px; font-family: monospace;"></textarea>
+                    <p>Или выберите файл:</p>
+                    <input type="file" id="import-file" accept=".json" style="margin: 10px 0;">
+                    <div class="modal-error" id="import-error"></div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn close-modal">Отмена</button>
+                    <button class="btn btn-primary" id="confirm-import">Импортировать</button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        // Импорт из текста
+        modal.querySelector('#confirm-import').addEventListener('click', async () => {
+            const textarea = modal.querySelector('#import-data');
+            const fileInput = modal.querySelector('#import-file');
+            const errorElement = modal.querySelector('#import-error');
+            
+            let jsonString = textarea.value.trim();
+            
+            // Если выбран файл, читаем его
+            if (fileInput.files.length > 0) {
+                const file = fileInput.files[0];
+                if (file.type !== 'application/json' && !file.name.endsWith('.json')) {
+                    errorElement.textContent = 'Выберите JSON файл';
+                    return;
+                }
+                
+                try {
+                    const result = await this.db.importFromFile(file);
+                    if (result.success) {
+                        this.showNotification(result.message);
+                        document.body.removeChild(modal);
+                        
+                        // Обновляем интерфейс
+                        this.loadFriends();
+                        this.loadGroups();
+                        this.loadChats();
+                        
+                        // Если открыт чат, обновляем сообщения
+                        if (this.currentChat) {
+                            this.loadMessages();
+                        }
+                    } else {
+                        errorElement.textContent = result.message;
+                    }
+                } catch (error) {
+                    errorElement.textContent = 'Ошибка чтения файла: ' + error.message;
+                }
+                return;
+            }
+            
+            // Импорт из текста
+            if (!jsonString) {
+                errorElement.textContent = 'Вставьте JSON код или выберите файл';
+                return;
+            }
+            
+            const result = this.db.importData(jsonString);
+            if (result.success) {
+                this.showNotification(result.message);
+                document.body.removeChild(modal);
+                
+                // Обновляем интерфейс
+                this.loadFriends();
+                this.loadGroups();
+                this.loadChats();
+                
+                // Если открыт чат, обновляем сообщения
+                if (this.currentChat) {
+                    this.loadMessages();
+                }
+            } else {
+                errorElement.textContent = result.message;
+            }
+        });
+        
+        // Закрытие модального окна
+        modal.querySelector('.close-modal').addEventListener('click', () => {
+            document.body.removeChild(modal);
+        });
+        
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                document.body.removeChild(modal);
+            }
+        });
+    }
+    
     switchAuthTab(tab) {
-        // Переключаем активную кнопку
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.tab === tab);
         });
         
-        // Переключаем активную форму
         document.getElementById('login-form').classList.toggle('active', tab === 'login');
         document.getElementById('register-form').classList.toggle('active', tab === 'register');
         
-        // Очищаем ошибки
         document.getElementById('login-error').textContent = '';
         document.getElementById('register-error').textContent = '';
     }
     
     switchSidebarTab(tab) {
-        // Переключаем активную кнопку
         document.querySelectorAll('.sidebar-tab').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.tab === tab);
         });
         
-        // Переключаем активный контент
         document.querySelectorAll('.sidebar-content').forEach(content => {
             content.classList.toggle('active', content.id === `${tab}-list`);
         });
@@ -501,7 +661,7 @@ class MessengerApp {
             this.currentUser = result.user;
             localStorage.setItem('messenger_currentUser', JSON.stringify(this.currentUser));
             this.showMainScreen();
-            this.showNotification('Успешный вход!');
+            this.showNotification('Вход выполнен!');
         } else {
             errorElement.textContent = result.message;
         }
@@ -524,7 +684,7 @@ class MessengerApp {
         }
         
         if (password.length < 6) {
-            errorElement.textContent = 'Пароль должен быть не менее 6 символов';
+            errorElement.textContent = 'Пароль минимум 6 символов';
             return;
         }
         
@@ -545,7 +705,7 @@ class MessengerApp {
         this.currentChat = null;
         localStorage.removeItem('messenger_currentUser');
         this.showAuthScreen();
-        this.showNotification('Вы вышли из системы');
+        this.showNotification('Вы вышли');
     }
     
     showAddFriendModal() {
@@ -559,7 +719,7 @@ class MessengerApp {
         const errorElement = document.getElementById('add-friend-error');
         
         if (!friendUsername) {
-            errorElement.textContent = 'Введите имя пользователя';
+            errorElement.textContent = 'Введите никнейм';
             return;
         }
         
@@ -578,20 +738,23 @@ class MessengerApp {
         document.getElementById('create-group-error').textContent = '';
         document.getElementById('group-name').value = '';
         
-        // Загружаем список друзей для выбора
         const friends = this.db.getFriends(this.currentUser.id);
         const membersList = document.getElementById('group-members-list');
         membersList.innerHTML = '';
         
-        friends.forEach(friend => {
-            const checkbox = document.createElement('div');
-            checkbox.className = 'checkbox-item';
-            checkbox.innerHTML = `
-                <input type="checkbox" id="member-${friend.id}" value="${friend.id}">
-                <label for="member-${friend.id}">${friend.username}</label>
-            `;
-            membersList.appendChild(checkbox);
-        });
+        if (friends.length === 0) {
+            membersList.innerHTML = '<p>Нет друзей для группы</p>';
+        } else {
+            friends.forEach(friend => {
+                const checkbox = document.createElement('div');
+                checkbox.className = 'checkbox-item';
+                checkbox.innerHTML = `
+                    <input type="checkbox" id="member-${friend.id}" value="${friend.id}">
+                    <label for="member-${friend.id}">${friend.username}</label>
+                `;
+                membersList.appendChild(checkbox);
+            });
+        }
         
         this.openModal('create-group-modal');
     }
@@ -601,16 +764,15 @@ class MessengerApp {
         const errorElement = document.getElementById('create-group-error');
         
         if (!groupName) {
-            errorElement.textContent = 'Введите название группы';
+            errorElement.textContent = 'Введите название';
             return;
         }
         
-        // Получаем выбранных участников
         const checkboxes = document.querySelectorAll('#group-members-list input[type="checkbox"]:checked');
         const memberIds = Array.from(checkboxes).map(cb => cb.value);
         
         if (memberIds.length === 0) {
-            errorElement.textContent = 'Выберите хотя бы одного участника';
+            errorElement.textContent = 'Выберите участников';
             return;
         }
         
@@ -619,9 +781,7 @@ class MessengerApp {
         if (result.success) {
             this.closeModal('create-group-modal');
             this.loadGroups();
-            this.showNotification(`Группа "${groupName}" создана!`);
-            
-            // Открываем чат с созданной группой
+            this.showNotification('Группа создана!');
             this.openChat('group', result.group.id);
         } else {
             errorElement.textContent = result.message;
@@ -631,13 +791,12 @@ class MessengerApp {
     showNewChatModal() {
         document.getElementById('new-chat-error').textContent = '';
         
-        // Загружаем список друзей для выбора
         const friends = this.db.getFriends(this.currentUser.id);
         const usersList = document.getElementById('new-chat-users-list');
         usersList.innerHTML = '';
         
         if (friends.length === 0) {
-            usersList.innerHTML = '<p>У вас пока нет друзей для начала чата</p>';
+            usersList.innerHTML = '<p>Нет друзей для чата</p>';
         } else {
             friends.forEach(friend => {
                 const item = document.createElement('div');
@@ -658,7 +817,7 @@ class MessengerApp {
         const errorElement = document.getElementById('new-chat-error');
         
         if (!selectedUser) {
-            errorElement.textContent = 'Выберите пользователя для чата';
+            errorElement.textContent = 'Выберите пользователя';
             return;
         }
         
@@ -671,7 +830,7 @@ class MessengerApp {
         const container = document.getElementById('friends-container');
         
         if (friends.length === 0) {
-            container.innerHTML = '<div class="contact-item"><p>У вас пока нет друзей</p></div>';
+            container.innerHTML = '<div class="contact-item"><p>Нет друзей</p></div>';
             return;
         }
         
@@ -686,7 +845,6 @@ class MessengerApp {
                 </div>
                 <div class="contact-info">
                     <h4>${friend.username}</h4>
-                    <p>В сети</p>
                 </div>
             `;
             
@@ -703,7 +861,7 @@ class MessengerApp {
         const container = document.getElementById('groups-container');
         
         if (groups.length === 0) {
-            container.innerHTML = '<div class="contact-item"><p>У вас пока нет групп</p></div>';
+            container.innerHTML = '<div class="contact-item"><p>Нет групп</p></div>';
             return;
         }
         
@@ -736,13 +894,12 @@ class MessengerApp {
         const container = document.getElementById('chats-container');
         
         if (friends.length === 0 && groups.length === 0) {
-            container.innerHTML = '<div class="contact-item"><p>У вас пока нет чатов</p></div>';
+            container.innerHTML = '<div class="contact-item"><p>Нет чатов</p></div>';
             return;
         }
         
         container.innerHTML = '';
         
-        // Добавляем чаты с друзьями
         friends.forEach(friend => {
             const messages = this.db.getPrivateMessages(this.currentUser.id, friend.id);
             const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
@@ -757,7 +914,7 @@ class MessengerApp {
                 </div>
                 <div class="contact-info">
                     <h4>${friend.username}</h4>
-                    <p>${lastMessage ? (lastMessage.senderId === this.currentUser.id ? 'Вы: ' : '') + lastMessage.text.substring(0, 20) + (lastMessage.text.length > 20 ? '...' : '') : 'Нет сообщений'}</p>
+                    <p>${lastMessage ? (lastMessage.senderId === this.currentUser.id ? 'Вы: ' : '') + this.truncateText(lastMessage.text, 20) : 'Нет сообщений'}</p>
                 </div>
                 <div class="contact-meta">
                     ${lastMessage ? this.formatTime(lastMessage.timestamp) : ''}
@@ -771,7 +928,6 @@ class MessengerApp {
             container.appendChild(chatElement);
         });
         
-        // Добавляем групповые чаты
         groups.forEach(group => {
             const messages = this.db.getGroupMessages(group.id);
             const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
@@ -787,7 +943,7 @@ class MessengerApp {
                 </div>
                 <div class="contact-info">
                     <h4>${group.name}</h4>
-                    <p>${lastMessage ? (lastSender ? lastSender.username + ': ' : '') + lastMessage.text.substring(0, 20) + (lastMessage.text.length > 20 ? '...' : '') : 'Нет сообщений'}</p>
+                    <p>${lastMessage ? (lastSender ? lastSender.username + ': ' : '') + this.truncateText(lastMessage.text, 20) : 'Нет сообщений'}</p>
                 </div>
                 <div class="contact-meta">
                     ${lastMessage ? this.formatTime(lastMessage.timestamp) : ''}
@@ -805,15 +961,11 @@ class MessengerApp {
     openChat(type, id) {
         this.currentChat = { type, id };
         
-        // Скрываем placeholder
         document.getElementById('chat-placeholder').classList.add('hidden');
-        
-        // Показываем элементы чата
         document.getElementById('chat-header').classList.remove('hidden');
         document.getElementById('messages-container').classList.remove('hidden');
         document.getElementById('message-input-container').classList.remove('hidden');
         
-        // Загружаем информацию о чате
         if (type === 'private') {
             const user = this.db.getUserById(id);
             if (user) {
@@ -830,11 +982,12 @@ class MessengerApp {
             }
         }
         
-        // Загружаем сообщения
         this.loadMessages();
-        
-        // Показываем активный чат в списке
         this.highlightActiveChat();
+        
+        setTimeout(() => {
+            document.getElementById('message-input').focus();
+        }, 100);
     }
     
     loadMessages() {
@@ -852,7 +1005,7 @@ class MessengerApp {
         }
         
         if (messages.length === 0) {
-            container.innerHTML = '<div class="no-messages"><p>Нет сообщений. Начните общение!</p></div>';
+            container.innerHTML = '<div class="no-messages"><p>Нет сообщений</p></div>';
             return;
         }
         
@@ -869,20 +1022,19 @@ class MessengerApp {
             
             messageElement.innerHTML = `
                 ${senderName}
-                <div class="message-bubble">${message.text}</div>
+                <div class="message-bubble">${this.escapeHtml(message.text)}</div>
                 <div class="message-info">${this.formatTime(message.timestamp)}</div>
             `;
             
             container.appendChild(messageElement);
         });
         
-        // Прокручиваем вниз
         container.scrollTop = container.scrollHeight;
     }
     
     sendMessage() {
         if (!this.currentChat) {
-            this.showNotification('Сначала выберите чат');
+            this.showNotification('Выберите чат');
             return;
         }
         
@@ -891,30 +1043,22 @@ class MessengerApp {
         
         if (!text) return;
         
-        // Добавляем сообщение в базу данных
         if (this.currentChat.type === 'private') {
             this.db.addMessage(this.currentUser.id, this.currentChat.id, null, text);
         } else if (this.currentChat.type === 'group') {
             this.db.addMessage(this.currentUser.id, null, this.currentChat.id, text);
         }
         
-        // Очищаем поле ввода
         input.value = '';
-        
-        // Обновляем сообщения
         this.loadMessages();
-        
-        // Обновляем список чатов
         this.loadChats();
     }
     
     highlightActiveChat() {
-        // Убираем выделение со всех чатов
         document.querySelectorAll('.contact-item').forEach(item => {
             item.classList.remove('active');
         });
         
-        // Находим и выделяем активный чат
         if (this.currentChat.type === 'private') {
             const chatElement = document.querySelector(`.contact-item[data-user-id="${this.currentChat.id}"]`);
             if (chatElement) chatElement.classList.add('active');
@@ -932,10 +1076,9 @@ class MessengerApp {
         document.getElementById(modalId).classList.add('hidden');
     }
     
-    showNotification(message, type = 'success') {
+    showNotification(message) {
         const notification = document.getElementById('notification');
         notification.textContent = message;
-        notification.className = `notification ${type}`;
         notification.classList.remove('hidden');
         
         setTimeout(() => {
@@ -948,62 +1091,87 @@ class MessengerApp {
         const now = new Date();
         const diffMs = now - date;
         const diffMins = Math.floor(diffMs / 60000);
+        
+        if (diffMins < 1) return 'только что';
+        if (diffMins < 60) return `${diffMins} мин назад`;
+        
         const diffHours = Math.floor(diffMs / 3600000);
+        if (diffHours < 24) return `${diffHours} ч назад`;
+        
         const diffDays = Math.floor(diffMs / 86400000);
+        if (diffDays === 1) return 'вчера';
+        if (diffDays < 7) return `${diffDays} дн назад`;
         
-        if (diffMins < 1) {
-            return 'только что';
-        } else if (diffMins < 60) {
-            return `${diffMins} мин назад`;
-        } else if (diffHours < 24) {
-            return `${diffHours} ч назад`;
-        } else if (diffDays === 1) {
-            return 'вчера';
-        } else if (diffDays < 7) {
-            return `${diffDays} дн назад`;
-        } else {
-            return date.toLocaleDateString();
-        }
+        return date.toLocaleDateString();
     }
     
-    exportData() {
-        const data = this.db.exportData();
-        document.getElementById('export-data').value = data;
-        this.showNotification('Данные экспортированы');
+    truncateText(text, maxLength) {
+        if (text.length <= maxLength) return text;
+        return text.substring(0, maxLength) + '...';
     }
     
-    importData() {
-        const data = document.getElementById('import-data').value.trim();
-        const errorElement = document.getElementById('import-error');
-        
-        if (!data) {
-            errorElement.textContent = 'Введите данные для импорта';
-            return;
-        }
-        
-        const result = this.db.importData(data);
-        
-        if (result.success) {
-            errorElement.textContent = '';
-            this.closeModal('export-import-modal');
-            this.showNotification(result.message);
-            
-            // Обновляем данные на экране
-            this.loadFriends();
-            this.loadGroups();
-            this.loadChats();
-            
-            // Если открыт чат, обновляем сообщения
-            if (this.currentChat) {
-                this.loadMessages();
-            }
-        } else {
-            errorElement.textContent = result.message;
-        }
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 }
 
-// Инициализация приложения после загрузки страницы
+// Инициализация приложения
 document.addEventListener('DOMContentLoaded', () => {
-    new MessengerApp();
+    window.app = new MessengerApp();
 });
+
+// ==================== ФУНКЦИИ ДЛЯ КОНСОЛИ ====================
+
+// Экспорт данных
+window.exportData = function() {
+    const db = new SimpleDB();
+    const data = db.exportData();
+    console.log('=== КОД ДЛЯ ЭКСПОРТА ===');
+    console.log(data);
+    console.log('=======================');
+    
+    // Копируем в буфер
+    navigator.clipboard.writeText(data).then(() => {
+        alert('Данные скопированы в буфер! Вставьте их на другом устройстве.');
+    }).catch(err => {
+        alert('Скопируйте текст из консоли (F12)');
+    });
+    
+    return data;
+};
+
+// Импорт данных
+window.importData = function(jsonString) {
+    const db = new SimpleDB();
+    const result = db.importData(jsonString);
+    alert(result.message);
+    if (result.success) {
+        location.reload();
+    }
+};
+
+// Показать информацию о данных
+window.showDataInfo = function() {
+    const db = new SimpleDB();
+    const data = db.getAllData();
+    
+    console.log('=== ИНФОРМАЦИЯ О ДАННЫХ ===');
+    console.log('Пользователей:', data.users.length);
+    console.log('Дружеских связей:', data.friendships.length);
+    console.log('Групп:', data.groups.length);
+    console.log('Сообщений:', data.messages.length);
+    console.log('===========================');
+    
+    return data;
+};
+
+// Сброс данных
+window.resetData = function() {
+    if (confirm('Сбросить все данные? Восстановить будет нельзя.')) {
+        localStorage.clear();
+        alert('Данные сброшены. Страница перезагрузится.');
+        location.reload();
+    }
+};
