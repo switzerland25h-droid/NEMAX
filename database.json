@@ -1,1 +1,11 @@
-
+{
+  "users": [
+    {"id": "user1", "username": "user1", "password": "pass123", "createdAt": "2024-01-01T00:00:00.000Z"},
+    {"id": "user2", "username": "user2", "password": "pass123", "createdAt": "2024-01-01T00:00:00.000Z"},
+    {"id": "user3", "username": "user3", "password": "pass123", "createdAt": "2024-01-01T00:00:00.000Z"}
+  ],
+  "friendships": [],
+  "groups": [],
+  "messages": [],
+  "lastUpdated": "2024-01-01T00:00:00.000Z"
+}
