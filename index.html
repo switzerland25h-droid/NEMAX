@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Browser Messenger</title>
+    <title>Простой мессенджер</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
 </head>
@@ -13,8 +13,8 @@
         <div id="auth-screen" class="screen">
             <div class="auth-container">
                 <div class="auth-header">
-                    <h1><i class="fas fa-comments"></i> Browser Messenger</h1>
-                    <p>Общайтесь прямо в браузере</p>
+                    <h1><i class="fas fa-comments"></i> Простой мессенджер</h1>
+                    <p>Работает на всех устройствах</p>
                 </div>
                 
                 <div class="auth-tabs">
@@ -25,11 +25,11 @@
                 <div id="login-form" class="auth-form active">
                     <div class="form-group">
                         <label for="login-username">Имя пользователя</label>
-                        <input type="text" id="login-username" placeholder="Введите ваш никнейм">
+                        <input type="text" id="login-username" placeholder="Ваш никнейм">
                     </div>
                     <div class="form-group">
                         <label for="login-password">Пароль</label>
-                        <input type="password" id="login-password" placeholder="Введите пароль">
+                        <input type="password" id="login-password" placeholder="Ваш пароль">
                     </div>
                     <button id="login-btn" class="btn btn-primary">Войти</button>
                     <div class="auth-error" id="login-error"></div>
@@ -53,15 +53,13 @@
                 </div>
                 
                 <div class="demo-info">
-                    <p><strong>Демо-аккаунты:</strong></p>
-                    <p>user1 / pass123</p>
-                    <p>user2 / pass123</p>
-                    <p>user3 / pass123</p>
+                    <p><strong>Все данные хранятся локально в вашем браузере</strong></p>
+                    <p>Для синхронизации между устройствами используйте экспорт данных</p>
                 </div>
             </div>
         </div>
         
-        <!-- Основной интерфейс мессенджера -->
+        <!-- Основной интерфейс -->
         <div id="main-screen" class="screen hidden">
             <!-- Боковая панель -->
             <div class="sidebar">
@@ -101,7 +99,7 @@
                         </button>
                     </div>
                     <div class="contacts-list" id="chats-container">
-                        <!-- Чаты будут загружаться здесь -->
+                        <!-- Чаты будут здесь -->
                     </div>
                 </div>
                 
@@ -114,7 +112,7 @@
                         </button>
                     </div>
                     <div class="contacts-list" id="friends-container">
-                        <!-- Друзья будут загружаться здесь -->
+                        <!-- Друзья будут здесь -->
                     </div>
                 </div>
                 
@@ -127,14 +125,14 @@
                         </button>
                     </div>
                     <div class="contacts-list" id="groups-container">
-                        <!-- Группы будут загружаться здесь -->
+                        <!-- Группы будут здесь -->
                     </div>
                 </div>
             </div>
             
-            <!-- Основная область чата -->
+            <!-- Область чата -->
             <div class="chat-area">
-                <!-- Заглушка при выборе чата -->
+                <!-- Заглушка -->
                 <div id="chat-placeholder" class="chat-placeholder">
                     <div class="placeholder-content">
                         <i class="fas fa-comments"></i>
@@ -143,7 +141,7 @@
                     </div>
                 </div>
                 
-                <!-- Заголовок активного чата -->
+                <!-- Заголовок чата -->
                 <div id="chat-header" class="chat-header hidden">
                     <div class="chat-info">
                         <div class="avatar small">
@@ -154,19 +152,14 @@
                             <p id="chat-subtitle"></p>
                         </div>
                     </div>
-                    <div class="chat-actions">
-                        <button id="chat-info-btn" class="btn-icon" title="Информация о чате">
-                            <i class="fas fa-info-circle"></i>
-                        </button>
-                    </div>
                 </div>
                 
-                <!-- Область сообщений -->
+                <!-- Сообщения -->
                 <div id="messages-container" class="messages-container hidden">
-                    <!-- Сообщения будут загружаться здесь -->
+                    <!-- Сообщения здесь -->
                 </div>
                 
-                <!-- Панель ввода сообщений -->
+                <!-- Ввод сообщений -->
                 <div id="message-input-container" class="message-input-container hidden">
                     <div class="message-input-wrapper">
                         <input type="text" id="message-input" placeholder="Введите сообщение...">
@@ -174,19 +167,6 @@
                             <i class="fas fa-paper-plane"></i>
                         </button>
                     </div>
-                </div>
-            </div>
-            
-            <!-- Панель информации о чате -->
-            <div id="info-panel" class="info-panel hidden">
-                <div class="info-header">
-                    <h4>Информация</h4>
-                    <button id="close-info-btn" class="btn-icon">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                <div class="info-content" id="chat-info-content">
-                    <!-- Информация о чате будет загружаться здесь -->
                 </div>
             </div>
         </div>
@@ -230,7 +210,7 @@
                     <div class="form-group">
                         <label>Выберите участников:</label>
                         <div id="group-members-list">
-                            <!-- Список друзей для выбора будет загружен здесь -->
+                            <!-- Список друзей -->
                         </div>
                     </div>
                     <div class="modal-error" id="create-group-error"></div>
@@ -254,7 +234,7 @@
                     <div class="form-group">
                         <label>Выберите собеседника:</label>
                         <div id="new-chat-users-list">
-                            <!-- Список друзей для выбора будет загружен здесь -->
+                            <!-- Список друзей -->
                         </div>
                     </div>
                     <div class="modal-error" id="new-chat-error"></div>
@@ -262,33 +242,6 @@
                 <div class="modal-footer">
                     <button class="btn" id="cancel-new-chat">Отмена</button>
                     <button class="btn btn-primary" id="confirm-new-chat">Начать чат</button>
-                </div>
-            </div>
-        </div>
-        
-        <div id="export-import-modal" class="modal hidden">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3>Экспорт / Импорт данных</h3>
-                    <button class="btn-icon close-modal">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                <div class="modal-body">
-                    <div class="form-group">
-                        <label for="export-data">Экспортировать данные</label>
-                        <textarea id="export-data" readonly placeholder="Нажмите 'Экспортировать', чтобы получить данные"></textarea>
-                        <button class="btn btn-secondary" id="export-btn">Экспортировать</button>
-                    </div>
-                    <div class="form-group">
-                        <label for="import-data">Импортировать данные</label>
-                        <textarea id="import-data" placeholder="Вставьте данные для импорта"></textarea>
-                        <button class="btn btn-secondary" id="import-btn">Импортировать</button>
-                    </div>
-                    <div class="modal-error" id="import-error"></div>
-                </div>
-                <div class="modal-footer">
-                    <button class="btn close-modal">Закрыть</button>
                 </div>
             </div>
         </div>
