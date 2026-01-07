@@ -1,6 +1,6 @@
 // ==================== НАСТРОЙКИ ====================
-const GITHUB_USERNAME = 'ВАШ_GITHUB_ЛОГИН'; // Замените на ваш логин
-const GITHUB_REPO = 'НАЗВАНИЕ_РЕПОЗИТОРИЯ'; // Замените на название репозитория
+const GITHUB_USERNAME = 'switzerland25h-droid'; // Замените на ваш логин
+const GITHUB_REPO = 'NEMAX'; // Замените на название репозитория
 const GITHUB_TOKEN = ''; // Можно оставить пустым для публичного репозитория
 
 // ==================== БАЗА ДАННЫХ НА GITHUB ====================
@@ -1432,3 +1432,4 @@ const extraStyles = `
 
 // Добавляем стили в документ
 document.head.insertAdjacentHTML('beforeend', extraStyles);
+
