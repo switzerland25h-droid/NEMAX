@@ -1,7 +1,7 @@
 // ==================== НАСТРОЙКИ ====================
 const GITHUB_USERNAME = 'switzerland25h-droid'; // Замените на ваш логин
 const GITHUB_REPO = 'NEMAX'; // Замените на название репозитория
-const GITHUB_TOKEN = ''; // Можно оставить пустым для публичного репозитория
+const GITHUB_TOKEN = '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'; // Можно оставить пустым для публичного репозитория
 
 // ==================== БАЗА ДАННЫХ НА GITHUB ====================
 class GitHubDB {
@@ -1432,4 +1432,5 @@ const extraStyles = `
 
 // Добавляем стили в документ
 document.head.insertAdjacentHTML('beforeend', extraStyles);
+
 
