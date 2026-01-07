@@ -1,4 +1,4 @@
-// ==================== ПРОСТАЯ БАЗА ДАННЫХ ====================
+// ==================== ПРОСТАЯ БАЗА ДАННЫХ С ЭКСПОРТОМ ====================
 class SimpleDB {
     constructor() {
         this.initDB();
@@ -6,34 +6,101 @@ class SimpleDB {
     
     initDB() {
         // Создаем демо-данные при первом запуске
-        if (!localStorage.getItem('messenger_users')) {
-            const demoUsers = [
+        if (!localStorage.getItem('messenger_data')) {
+            this.createDemoData();
+        }
+    }
+    
+    createDemoData() {
+        const demoData = {
+            users: [
                 { 
                     id: 'user1',
                     username: 'user1', 
-                    password: 'pass123'
+                    password: 'pass123',
+                    createdAt: new Date().toISOString()
                 },
                 { 
                     id: 'user2',
                     username: 'user2', 
-                    password: 'pass123'
+                    password: 'pass123',
+                    createdAt: new Date().toISOString()
                 },
                 { 
                     id: 'user3',
                     username: 'user3', 
-                    password: 'pass123'
+                    password: 'pass123',
+                    createdAt: new Date().toISOString()
                 }
-            ];
-            localStorage.setItem('messenger_users', JSON.stringify(demoUsers));
-            localStorage.setItem('messenger_friendships', JSON.stringify([]));
-            localStorage.setItem('messenger_groups', JSON.stringify([]));
-            localStorage.setItem('messenger_messages', JSON.stringify([]));
+            ],
+            friendships: [
+                { id: 'f1', userId: 'user1', friendId: 'user2', accepted: true },
+                { id: 'f2', userId: 'user1', friendId: 'user3', accepted: true },
+                { id: 'f3', userId: 'user2', friendId: 'user3', accepted: true }
+            ],
+            groups: [
+                {
+                    id: 'group1',
+                    name: 'Демо группа',
+                    creatorId: 'user1',
+                    members: ['user1', 'user2', 'user3'],
+                    createdAt: new Date().toISOString()
+                }
+            ],
+            messages: [
+                {
+                    id: 'msg1',
+                    senderId: 'user1',
+                    receiverId: 'user2',
+                    groupId: null,
+                    text: 'Привет! Как дела?',
+                    timestamp: new Date(Date.now() - 3600000).toISOString()
+                },
+                {
+                    id: 'msg2',
+                    senderId: 'user2',
+                    receiverId: 'user1',
+                    groupId: null,
+                    text: 'Привет! Все отлично, спасибо!',
+                    timestamp: new Date(Date.now() - 3000000).toISOString()
+                }
+            ]
+        };
+        
+        this.saveAllData(demoData);
+    }
+    
+    // ==================== МЕТОДЫ ДЛЯ РАБОТЫ С ДАННЫМИ ====================
+    
+    getAllData() {
+        const data = localStorage.getItem('messenger_data');
+        if (data) {
+            try {
+                return JSON.parse(data);
+            } catch (e) {
+                console.error('Ошибка парсинга данных:', e);
+                return this.getEmptyData();
+            }
         }
+        return this.getEmptyData();
+    }
+    
+    getEmptyData() {
+        return {
+            users: [],
+            friendships: [],
+            groups: [],
+            messages: []
+        };
+    }
+    
+    saveAllData(data) {
+        localStorage.setItem('messenger_data', JSON.stringify(data));
     }
     
     // Пользователи
     getUsers() {
-        return JSON.parse(localStorage.getItem('messenger_users') || '[]');
+        return this.getAllData().users;
     }
     
     getUserByUsername(username) {
@@ -47,7 +114,8 @@ class SimpleDB {
     }
     
     addUser(username, password) {
-        const users = this.getUsers();
+        const data = this.getAllData();
+        const users = data.users;
         
         if (users.some(user => user.username === username)) {
             return { success: false, message: 'Пользователь уже существует' };
@@ -56,11 +124,13 @@ class SimpleDB {
         const newUser = {
             id: 'user_' + Date.now(),
             username,
-            password
+            password,
+            createdAt: new Date().toISOString()
         };
         
         users.push(newUser);
-        localStorage.setItem('messenger_users', JSON.stringify(users));
+        data.users = users;
+        this.saveAllData(data);
         
         return { success: true, user: newUser };
     }
@@ -80,7 +150,7 @@ class SimpleDB {
     
     // Друзья
     getFriendships() {
-        return JSON.parse(localStorage.getItem('messenger_friendships') || '[]');
+        return this.getAllData().friendships;
     }
     
     getFriends(userId) {
@@ -106,7 +176,8 @@ class SimpleDB {
             return { success: false, message: 'Нельзя добавить себя' };
         }
         
-        const friendships = this.getFriendships();
+        const data = this.getAllData();
+        const friendships = data.friendships;
         
         const existing = friendships.find(f => 
             (f.userId === userId && f.friendId === friendUser.id) || 
@@ -122,7 +193,8 @@ class SimpleDB {
             }
             // Принимаем запрос
             existing.accepted = true;
-            localStorage.setItem('messenger_friendships', JSON.stringify(friendships));
+            data.friendships = friendships;
+            this.saveAllData(data);
             return { success: true, message: 'Запрос принят' };
         }
         
@@ -133,13 +205,14 @@ class SimpleDB {
             accepted: false
         });
         
-        localStorage.setItem('messenger_friendships', JSON.stringify(friendships));
+        data.friendships = friendships;
+        this.saveAllData(data);
         return { success: true, message: 'Запрос отправлен' };
     }
     
     // Группы
     getGroups() {
-        return JSON.parse(localStorage.getItem('messenger_groups') || '[]');
+        return this.getAllData().groups;
     }
     
     getGroupById(id) {
@@ -157,23 +230,27 @@ class SimpleDB {
             memberIds.push(creatorId);
         }
         
-        const groups = this.getGroups();
+        const data = this.getAllData();
+        const groups = data.groups;
+        
         const newGroup = {
             id: 'group_' + Date.now(),
             name,
             creatorId,
-            members: memberIds
+            members: memberIds,
+            createdAt: new Date().toISOString()
         };
         
         groups.push(newGroup);
-        localStorage.setItem('messenger_groups', JSON.stringify(groups));
+        data.groups = groups;
+        this.saveAllData(data);
         
         return { success: true, group: newGroup };
     }
     
     // Сообщения
     getMessages() {
-        return JSON.parse(localStorage.getItem('messenger_messages') || '[]');
+        return this.getAllData().messages;
     }
     
     getPrivateMessages(user1Id, user2Id) {
@@ -191,7 +268,9 @@ class SimpleDB {
     }
     
     addMessage(senderId, receiverId, groupId, text) {
-        const messages = this.getMessages();
+        const data = this.getAllData();
+        const messages = data.messages;
+        
         const newMessage = {
             id: 'msg_' + Date.now(),
             senderId,
@@ -202,20 +281,16 @@ class SimpleDB {
         };
         
         messages.push(newMessage);
-        localStorage.setItem('messenger_messages', JSON.stringify(messages));
+        data.messages = messages;
+        this.saveAllData(data);
         
         return newMessage;
     }
     
-    // Экспорт/импорт данных
+    // ==================== ЭКСПОРТ/ИМПОРТ ДАННЫХ ====================
+    
     exportData() {
-        const data = {
-            users: this.getUsers(),
-            friendships: this.getFriendships(),
-            groups: this.getGroups(),
-            messages: this.getMessages()
-        };
-        
+        const data = this.getAllData();
         return JSON.stringify(data, null, 2);
     }
     
@@ -223,19 +298,51 @@ class SimpleDB {
         try {
             const data = JSON.parse(jsonString);
             
+            // Проверяем структуру
             if (!data.users || !data.friendships || !data.groups || !data.messages) {
-                return { success: false, message: 'Неправильный формат' };
+                return { success: false, message: 'Неправильный формат данных' };
             }
             
-            localStorage.setItem('messenger_users', JSON.stringify(data.users));
-            localStorage.setItem('messenger_friendships', JSON.stringify(data.friendships));
-            localStorage.setItem('messenger_groups', JSON.stringify(data.groups));
-            localStorage.setItem('messenger_messages', JSON.stringify(data.messages));
+            // Сохраняем данные
+            this.saveAllData(data);
             
-            return { success: true, message: 'Данные импортированы' };
+            return { success: true, message: 'Данные успешно импортированы!' };
         } catch (error) {
-            return { success: false, message: 'Ошибка импорта' };
+            return { success: false, message: 'Ошибка при импорте: ' + error.message };
         }
+    }
+    
+    // Экспорт данных в файл (скачивание)
+    exportToFile() {
+        const data = this.exportData();
+        const blob = new Blob([data], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'messenger_backup_' + new Date().toISOString().split('T')[0] + '.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        
+        URL.revokeObjectURL(url);
+        
+        return 'Данные экспортированы в файл!';
+    }
+    
+    // Импорт из файла
+    importFromFile(file) {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const result = this.importData(e.target.result);
+                resolve(result);
+            };
+            reader.onerror = () => {
+                resolve({ success: false, message: 'Ошибка чтения файла' });
+            };
+            reader.readAsText(file);
+        });
     }
 }
 
@@ -317,6 +424,22 @@ class MessengerApp {
                 this.sendMessage();
             }
         });
+        
+        // Кнопка экспорта данных
+        const exportBtn = document.createElement('button');
+        exportBtn.className = 'btn-icon';
+        exportBtn.title = 'Экспорт данных';
+        exportBtn.innerHTML = '<i class="fas fa-download"></i>';
+        exportBtn.addEventListener('click', () => this.showExportModal());
+        document.querySelector('.sidebar-header').appendChild(exportBtn);
+        
+        // Кнопка импорта данных
+        const importBtn = document.createElement('button');
+        importBtn.className = 'btn-icon';
+        importBtn.title = 'Импорт данных';
+        importBtn.innerHTML = '<i class="fas fa-upload"></i>';
+        importBtn.addEventListener('click', () => this.showImportModal());
+        document.querySelector('.sidebar-header').appendChild(importBtn);
     }
     
     setupModals() {
@@ -340,6 +463,163 @@ class MessengerApp {
                     modal.classList.add('hidden');
                 }
             });
+        });
+    }
+    
+    showExportModal() {
+        const data = this.db.exportData();
+        
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Экспорт данных</h3>
+                    <button class="btn-icon close-modal">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <p>Скопируйте этот код и сохраните его. Используйте для переноса данных на другое устройство.</p>
+                    <textarea id="export-data" readonly style="width: 100%; height: 200px; margin: 10px 0; padding: 10px; font-family: monospace;">${data}</textarea>
+                    <button id="copy-btn" class="btn btn-primary">Копировать в буфер</button>
+                    <button id="download-btn" class="btn btn-secondary" style="margin-left: 10px;">Скачать файл</button>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn close-modal">Закрыть</button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        // Копирование в буфер
+        modal.querySelector('#copy-btn').addEventListener('click', () => {
+            const textarea = modal.querySelector('#export-data');
+            textarea.select();
+            document.execCommand('copy');
+            this.showNotification('Данные скопированы в буфер!');
+        });
+        
+        // Скачивание файла
+        modal.querySelector('#download-btn').addEventListener('click', () => {
+            const result = this.db.exportToFile();
+            this.showNotification(result);
+        });
+        
+        // Закрытие модального окна
+        modal.querySelector('.close-modal').addEventListener('click', () => {
+            document.body.removeChild(modal);
+        });
+        
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                document.body.removeChild(modal);
+            }
+        });
+    }
+    
+    showImportModal() {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Импорт данных</h3>
+                    <button class="btn-icon close-modal">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <p>Вставьте код с экспортированными данными или выберите файл:</p>
+                    <textarea id="import-data" placeholder="Вставьте JSON код здесь..." style="width: 100%; height: 150px; margin: 10px 0; padding: 10px; font-family: monospace;"></textarea>
+                    <p>Или выберите файл:</p>
+                    <input type="file" id="import-file" accept=".json" style="margin: 10px 0;">
+                    <div class="modal-error" id="import-error"></div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn close-modal">Отмена</button>
+                    <button class="btn btn-primary" id="confirm-import">Импортировать</button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        // Импорт из текста
+        modal.querySelector('#confirm-import').addEventListener('click', async () => {
+            const textarea = modal.querySelector('#import-data');
+            const fileInput = modal.querySelector('#import-file');
+            const errorElement = modal.querySelector('#import-error');
+            
+            let jsonString = textarea.value.trim();
+            
+            // Если выбран файл, читаем его
+            if (fileInput.files.length > 0) {
+                const file = fileInput.files[0];
+                if (file.type !== 'application/json' && !file.name.endsWith('.json')) {
+                    errorElement.textContent = 'Выберите JSON файл';
+                    return;
+                }
+                
+                try {
+                    const result = await this.db.importFromFile(file);
+                    if (result.success) {
+                        this.showNotification(result.message);
+                        document.body.removeChild(modal);
+                        
+                        // Обновляем интерфейс
+                        this.loadFriends();
+                        this.loadGroups();
+                        this.loadChats();
+                        
+                        // Если открыт чат, обновляем сообщения
+                        if (this.currentChat) {
+                            this.loadMessages();
+                        }
+                    } else {
+                        errorElement.textContent = result.message;
+                    }
+                } catch (error) {
+                    errorElement.textContent = 'Ошибка чтения файла: ' + error.message;
+                }
+                return;
+            }
+            
+            // Импорт из текста
+            if (!jsonString) {
+                errorElement.textContent = 'Вставьте JSON код или выберите файл';
+                return;
+            }
+            
+            const result = this.db.importData(jsonString);
+            if (result.success) {
+                this.showNotification(result.message);
+                document.body.removeChild(modal);
+                
+                // Обновляем интерфейс
+                this.loadFriends();
+                this.loadGroups();
+                this.loadChats();
+                
+                // Если открыт чат, обновляем сообщения
+                if (this.currentChat) {
+                    this.loadMessages();
+                }
+            } else {
+                errorElement.textContent = result.message;
+            }
+        });
+        
+        // Закрытие модального окна
+        modal.querySelector('.close-modal').addEventListener('click', () => {
+            document.body.removeChild(modal);
+        });
+        
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                document.body.removeChild(modal);
+            }
         });
     }
     
@@ -842,19 +1122,56 @@ document.addEventListener('DOMContentLoaded', () => {
     window.app = new MessengerApp();
 });
 
-// Функции для консоли
+// ==================== ФУНКЦИИ ДЛЯ КОНСОЛИ ====================
+
+// Экспорт данных
 window.exportData = function() {
     const db = new SimpleDB();
     const data = db.exportData();
-    console.log('Данные для экспорта:');
+    console.log('=== КОД ДЛЯ ЭКСПОРТА ===');
     console.log(data);
-    alert('Данные скопированы в консоль (F12)');
+    console.log('=======================');
+    
+    // Копируем в буфер
+    navigator.clipboard.writeText(data).then(() => {
+        alert('Данные скопированы в буфер! Вставьте их на другом устройстве.');
+    }).catch(err => {
+        alert('Скопируйте текст из консоли (F12)');
+    });
+    
     return data;
 };
 
+// Импорт данных
 window.importData = function(jsonString) {
     const db = new SimpleDB();
     const result = db.importData(jsonString);
     alert(result.message);
-    location.reload();
+    if (result.success) {
+        location.reload();
+    }
+};
+
+// Показать информацию о данных
+window.showDataInfo = function() {
+    const db = new SimpleDB();
+    const data = db.getAllData();
+    
+    console.log('=== ИНФОРМАЦИЯ О ДАННЫХ ===');
+    console.log('Пользователей:', data.users.length);
+    console.log('Дружеских связей:', data.friendships.length);
+    console.log('Групп:', data.groups.length);
+    console.log('Сообщений:', data.messages.length);
+    console.log('===========================');
+    
+    return data;
+};
+
+// Сброс данных
+window.resetData = function() {
+    if (confirm('Сбросить все данные? Восстановить будет нельзя.')) {
+        localStorage.clear();
+        alert('Данные сброшены. Страница перезагрузится.');
+        location.reload();
+    }
 };
