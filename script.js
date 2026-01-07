@@ -1,18 +1,42 @@
-// ==================== ПРОСТАЯ БАЗА ДАННЫХ С ЭКСПОРТОМ ====================
-class SimpleDB {
+// ==================== НАСТРОЙКИ ====================
+const GITHUB_USERNAME = 'ВАШ_GITHUB_ЛОГИН'; // Замените на ваш логин
+const GITHUB_REPO = 'НАЗВАНИЕ_РЕПОЗИТОРИЯ'; // Замените на название репозитория
+const GITHUB_TOKEN = ''; // Можно оставить пустым для публичного репозитория
+
+// ==================== БАЗА ДАННЫХ НА GITHUB ====================
+class GitHubDB {
     constructor() {
-        this.initDB();
+        this.data = null;
+        this.filePath = 'database.json';
+        this.branch = 'main';
+        this.baseUrl = `https://api.github.com/repos/${GITHUB_USERNAME}/${GITHUB_REPO}/contents`;
+        this.init();
     }
     
-    initDB() {
-        // Создаем демо-данные при первом запуске
-        if (!localStorage.getItem('messenger_data')) {
-            this.createDemoData();
+    async init() {
+        // Сначала пробуем загрузить из localStorage
+        const localData = localStorage.getItem('messenger_data');
+        if (localData) {
+            try {
+                this.data = JSON.parse(localData);
+            } catch (e) {
+                console.log('Ошибка загрузки локальных данных');
+            }
+        }
+        
+        // Пробуем загрузить с GitHub
+        try {
+            await this.loadFromGitHub();
+        } catch (error) {
+            console.log('GitHub недоступен, работаем локально');
+            if (!this.data) {
+                this.createDemoData();
+            }
         }
     }
     
     createDemoData() {
-        const demoData = {
+        this.data = {
             users: [
                 { 
                     id: 'user1',
@@ -33,74 +57,140 @@ class SimpleDB {
                     createdAt: new Date().toISOString()
                 }
             ],
-            friendships: [
-                { id: 'f1', userId: 'user1', friendId: 'user2', accepted: true },
-                { id: 'f2', userId: 'user1', friendId: 'user3', accepted: true },
-                { id: 'f3', userId: 'user2', friendId: 'user3', accepted: true }
-            ],
-            groups: [
-                {
-                    id: 'group1',
-                    name: 'Демо группа',
-                    creatorId: 'user1',
-                    members: ['user1', 'user2', 'user3'],
-                    createdAt: new Date().toISOString()
-                }
-            ],
-            messages: [
-                {
-                    id: 'msg1',
-                    senderId: 'user1',
-                    receiverId: 'user2',
-                    groupId: null,
-                    text: 'Привет! Как дела?',
-                    timestamp: new Date(Date.now() - 3600000).toISOString()
-                },
-                {
-                    id: 'msg2',
-                    senderId: 'user2',
-                    receiverId: 'user1',
-                    groupId: null,
-                    text: 'Привет! Все отлично, спасибо!',
-                    timestamp: new Date(Date.now() - 3000000).toISOString()
-                }
-            ]
+            friendships: [],
+            groups: [],
+            messages: [],
+            lastUpdated: new Date().toISOString()
         };
+        this.saveToLocalStorage();
+    }
+    
+    saveToLocalStorage() {
+        localStorage.setItem('messenger_data', JSON.stringify(this.data));
+    }
+    
+    async loadFromGitHub() {
+        try {
+            const url = `${this.baseUrl}/${this.filePath}`;
+            const headers = {};
+            
+            if (GITHUB_TOKEN) {
+                headers['Authorization'] = `token ${GITHUB_TOKEN}`;
+            }
+            
+            const response = await fetch(url, { headers });
+            
+            if (!response.ok) {
+                throw new Error('Файл не найден на GitHub');
+            }
+            
+            const fileData = await response.json();
+            const content = atob(fileData.content); // Декодируем base64
+            this.data = JSON.parse(content);
+            this.saveToLocalStorage();
+            
+            console.log('Данные загружены с GitHub');
+            return this.data;
+        } catch (error) {
+            console.log('Ошибка загрузки с GitHub:', error.message);
+            
+            // Если файла нет, создаем его
+            if (error.message.includes('не найден')) {
+                await this.createFileOnGitHub();
+            }
+            
+            throw error;
+        }
+    }
+    
+    async createFileOnGitHub() {
+        if (!GITHUB_TOKEN) {
+            console.log('Для создания файла нужен GitHub токен');
+            return null;
+        }
         
-        this.saveAllData(demoData);
+        this.createDemoData();
+        const content = btoa(JSON.stringify(this.data, null, 2));
+        
+        const response = await fetch(`${this.baseUrl}/${this.filePath}`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `token ${GITHUB_TOKEN}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                message: 'Создание файла базы данных',
+                content: content,
+                branch: this.branch
+            })
+        });
+        
+        if (response.ok) {
+            console.log('Файл создан на GitHub');
+            return await response.json();
+        } else {
+            throw new Error('Не удалось создать файл');
+        }
+    }
+    
+    async saveToGitHub() {
+        if (!GITHUB_TOKEN) {
+            console.log('Для сохранения на GitHub нужен токен');
+            this.saveToLocalStorage();
+            return false;
+        }
+        
+        this.data.lastUpdated = new Date().toISOString();
+        const content = btoa(JSON.stringify(this.data, null, 2));
+        
+        try {
+            // Сначала получаем текущий файл, чтобы узнать его SHA
+            const getResponse = await fetch(`${this.baseUrl}/${this.filePath}`, {
+                headers: {
+                    'Authorization': `token ${GITHUB_TOKEN}`
+                }
+            });
+            
+            if (!getResponse.ok) {
+                throw new Error('Файл не найден');
+            }
+            
+            const fileData = await getResponse.json();
+            const sha = fileData.sha;
+            
+            // Обновляем файл
+            const putResponse = await fetch(`${this.baseUrl}/${this.filePath}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `token ${GITHUB_TOKEN}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    message: 'Обновление базы данных',
+                    content: content,
+                    sha: sha,
+                    branch: this.branch
+                })
+            });
+            
+            if (putResponse.ok) {
+                console.log('Данные сохранены на GitHub');
+                this.saveToLocalStorage();
+                return true;
+            } else {
+                throw new Error('Не удалось сохранить');
+            }
+        } catch (error) {
+            console.log('Ошибка сохранения на GitHub:', error.message);
+            this.saveToLocalStorage();
+            return false;
+        }
     }
     
     // ==================== МЕТОДЫ ДЛЯ РАБОТЫ С ДАННЫМИ ====================
     
-    getAllData() {
-        const data = localStorage.getItem('messenger_data');
-        if (data) {
-            try {
-                return JSON.parse(data);
-            } catch (e) {
-                console.error('Ошибка парсинга данных:', e);
-                return this.getEmptyData();
-            }
-        }
-        return this.getEmptyData();
-    }
-    
-    getEmptyData() {
-        return {
-            users: [],
-            friendships: [],
-            groups: [],
-            messages: []
-        };
-    }
-    
-    saveAllData(data) {
-        localStorage.setItem('messenger_data', JSON.stringify(data));
-    }
-    
-    // Пользователи
     getUsers() {
-        return this.getAllData().users;
+        return this.data?.users || [];
     }
     
     getUserByUsername(username) {
@@ -113,9 +203,8 @@ class SimpleDB {
         return users.find(user => user.id === id);
     }
     
-    addUser(username, password) {
-        const data = this.getAllData();
-        const users = data.users;
+    async addUser(username, password) {
+        const users = this.getUsers();
         
         if (users.some(user => user.username === username)) {
             return { success: false, message: 'Пользователь уже существует' };
@@ -129,14 +218,20 @@ class SimpleDB {
         };
         
         users.push(newUser);
-        data.users = users;
-        this.saveAllData(data);
+        this.data.users = users;
         
-        return { success: true, user: newUser };
+        const saved = await this.saveToGitHub();
+        
+        return { 
+            success: true, 
+            user: newUser,
+            savedToCloud: saved
+        };
     }
     
     validateUser(username, password) {
         const user = this.getUserByUsername(username);
+        
         if (!user) {
             return { success: false, message: 'Пользователь не найден' };
         }
@@ -148,9 +243,8 @@ class SimpleDB {
         return { success: true, user };
     }
     
-    // Друзья
     getFriendships() {
-        return this.getAllData().friendships;
+        return this.data?.friendships || [];
     }
     
     getFriends(userId) {
@@ -165,7 +259,7 @@ class SimpleDB {
         return friendIds.map(id => users.find(user => user.id === id)).filter(user => user);
     }
     
-    addFriend(userId, friendUsername) {
+    async addFriend(userId, friendUsername) {
         const friendUser = this.getUserByUsername(friendUsername);
         
         if (!friendUser) {
@@ -176,8 +270,7 @@ class SimpleDB {
             return { success: false, message: 'Нельзя добавить себя' };
         }
         
-        const data = this.getAllData();
-        const friendships = data.friendships;
+        const friendships = this.getFriendships();
         
         const existing = friendships.find(f => 
             (f.userId === userId && f.friendId === friendUser.id) || 
@@ -191,11 +284,14 @@ class SimpleDB {
             if (existing.userId === userId) {
                 return { success: false, message: 'Запрос уже отправлен' };
             }
-            // Принимаем запрос
             existing.accepted = true;
-            data.friendships = friendships;
-            this.saveAllData(data);
-            return { success: true, message: 'Запрос принят' };
+            this.data.friendships = friendships;
+            const saved = await this.saveToGitHub();
+            return { 
+                success: true, 
+                message: 'Запрос принят',
+                savedToCloud: saved
+            };
         }
         
         friendships.push({
@@ -205,14 +301,18 @@ class SimpleDB {
             accepted: false
         });
         
-        data.friendships = friendships;
-        this.saveAllData(data);
-        return { success: true, message: 'Запрос отправлен' };
+        this.data.friendships = friendships;
+        const saved = await this.saveToGitHub();
+        
+        return { 
+            success: true, 
+            message: 'Запрос отправлен',
+            savedToCloud: saved
+        };
     }
     
-    // Группы
     getGroups() {
-        return this.getAllData().groups;
+        return this.data?.groups || [];
     }
     
     getGroupById(id) {
@@ -225,14 +325,12 @@ class SimpleDB {
         return groups.filter(group => group.members.includes(userId));
     }
     
-    createGroup(name, creatorId, memberIds) {
+    async createGroup(name, creatorId, memberIds) {
         if (!memberIds.includes(creatorId)) {
             memberIds.push(creatorId);
         }
         
-        const data = this.getAllData();
-        const groups = data.groups;
-        
+        const groups = this.getGroups();
         const newGroup = {
             id: 'group_' + Date.now(),
             name,
@@ -242,15 +340,19 @@ class SimpleDB {
         };
         
         groups.push(newGroup);
-        data.groups = groups;
-        this.saveAllData(data);
+        this.data.groups = groups;
         
-        return { success: true, group: newGroup };
+        const saved = await this.saveToGitHub();
+        
+        return { 
+            success: true, 
+            group: newGroup,
+            savedToCloud: saved
+        };
     }
     
-    // Сообщения
     getMessages() {
-        return this.getAllData().messages;
+        return this.data?.messages || [];
     }
     
     getPrivateMessages(user1Id, user2Id) {
@@ -267,10 +369,8 @@ class SimpleDB {
             .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
     }
     
-    addMessage(senderId, receiverId, groupId, text) {
-        const data = this.getAllData();
-        const messages = data.messages;
-        
+    async addMessage(senderId, receiverId, groupId, text) {
+        const messages = this.getMessages();
         const newMessage = {
             id: 'msg_' + Date.now(),
             senderId,
@@ -281,82 +381,111 @@ class SimpleDB {
         };
         
         messages.push(newMessage);
-        data.messages = messages;
-        this.saveAllData(data);
+        this.data.messages = messages;
+        
+        // Сохраняем локально сразу, на GitHub - в фоне
+        this.saveToLocalStorage();
+        this.saveToGitHub().catch(() => {
+            console.log('Не удалось сохранить сообщение в облако');
+        });
         
         return newMessage;
     }
     
-    // ==================== ЭКСПОРТ/ИМПОРТ ДАННЫХ ====================
-    
+    // Экспорт/импорт
     exportData() {
-        const data = this.getAllData();
-        return JSON.stringify(data, null, 2);
+        return JSON.stringify(this.data, null, 2);
     }
     
-    importData(jsonString) {
+    async importData(jsonString) {
         try {
-            const data = JSON.parse(jsonString);
+            const newData = JSON.parse(jsonString);
             
-            // Проверяем структуру
-            if (!data.users || !data.friendships || !data.groups || !data.messages) {
-                return { success: false, message: 'Неправильный формат данных' };
+            if (!newData.users || !newData.friendships || !newData.groups || !newData.messages) {
+                return { success: false, message: 'Неправильный формат' };
             }
             
-            // Сохраняем данные
-            this.saveAllData(data);
+            this.data = newData;
+            this.saveToLocalStorage();
             
-            return { success: true, message: 'Данные успешно импортированы!' };
+            const saved = await this.saveToGitHub();
+            
+            return { 
+                success: true, 
+                message: saved ? 'Данные импортированы и сохранены в облако' : 'Данные импортированы локально',
+                savedToCloud: saved
+            };
         } catch (error) {
-            return { success: false, message: 'Ошибка при импорте: ' + error.message };
+            return { success: false, message: 'Ошибка импорта: ' + error.message };
         }
     }
     
-    // Экспорт данных в файл (скачивание)
-    exportToFile() {
-        const data = this.exportData();
-        const blob = new Blob([data], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'messenger_backup_' + new Date().toISOString().split('T')[0] + '.json';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        
-        URL.revokeObjectURL(url);
-        
-        return 'Данные экспортированы в файл!';
-    }
-    
-    // Импорт из файла
-    importFromFile(file) {
-        return new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const result = this.importData(e.target.result);
-                resolve(result);
-            };
-            reader.onerror = () => {
-                resolve({ success: false, message: 'Ошибка чтения файла' });
-            };
-            reader.readAsText(file);
-        });
+    // Синхронизация с GitHub
+    async syncWithGitHub() {
+        try {
+            await this.loadFromGitHub();
+            return { success: true, message: 'Данные синхронизированы с облаком' };
+        } catch (error) {
+            return { success: false, message: 'Не удалось синхронизировать: ' + error.message };
+        }
     }
 }
 
 // ==================== ОСНОВНОЕ ПРИЛОЖЕНИЕ ====================
 class MessengerApp {
     constructor() {
-        this.db = new SimpleDB();
+        this.db = new GitHubDB();
         this.currentUser = null;
         this.currentChat = null;
         
         this.init();
     }
     
-    init() {
+    async init() {
+        // Ждем загрузки базы данных
+        setTimeout(() => {
+            this.checkAuth();
+        }, 500);
+        
+        this.setupEventListeners();
+        this.setupModals();
+        
+        // Показываем статус синхронизации
+        this.showSyncStatus();
+    }
+    
+    showSyncStatus() {
+        // Проверяем, есть ли токен
+        const hasToken = GITHUB_TOKEN !== '';
+        const status = document.createElement('div');
+        status.id = 'sync-status';
+        status.className = 'sync-status';
+        status.innerHTML = `
+            <span>${hasToken ? '🟢 Облачная синхронизация' : '🟡 Локальный режим'}</span>
+            <button id="sync-btn" class="btn-icon small">
+                <i class="fas fa-sync-alt"></i>
+            </button>
+        `;
+        
+        document.querySelector('.sidebar-header').appendChild(status);
+        
+        // Кнопка синхронизации
+        document.getElementById('sync-btn').addEventListener('click', async () => {
+            const result = await this.db.syncWithGitHub();
+            this.showNotification(result.message);
+            
+            if (result.success) {
+                this.loadFriends();
+                this.loadGroups();
+                this.loadChats();
+                if (this.currentChat) {
+                    this.loadMessages();
+                }
+            }
+        });
+    }
+    
+    checkAuth() {
         const savedUser = localStorage.getItem('messenger_currentUser');
         if (savedUser) {
             try {
@@ -369,9 +498,6 @@ class MessengerApp {
         } else {
             this.showAuthScreen();
         }
-        
-        this.setupEventListeners();
-        this.setupModals();
     }
     
     showAuthScreen() {
@@ -425,21 +551,247 @@ class MessengerApp {
             }
         });
         
-        // Кнопка экспорта данных
-        const exportBtn = document.createElement('button');
-        exportBtn.className = 'btn-icon';
-        exportBtn.title = 'Экспорт данных';
-        exportBtn.innerHTML = '<i class="fas fa-download"></i>';
-        exportBtn.addEventListener('click', () => this.showExportModal());
-        document.querySelector('.sidebar-header').appendChild(exportBtn);
+        // Меню пользователя
+        const userMenuBtn = document.createElement('button');
+        userMenuBtn.className = 'btn-icon';
+        userMenuBtn.title = 'Меню';
+        userMenuBtn.innerHTML = '<i class="fas fa-ellipsis-v"></i>';
+        userMenuBtn.addEventListener('click', () => this.showUserMenu());
+        document.querySelector('.sidebar-header').appendChild(userMenuBtn);
+    }
+    
+    showUserMenu() {
+        const menu = document.createElement('div');
+        menu.className = 'user-menu';
+        menu.innerHTML = `
+            <div class="menu-item" data-action="export">
+                <i class="fas fa-download"></i> Экспорт данных
+            </div>
+            <div class="menu-item" data-action="import">
+                <i class="fas fa-upload"></i> Импорт данных
+            </div>
+            <div class="menu-item" data-action="sync">
+                <i class="fas fa-sync-alt"></i> Синхронизировать
+            </div>
+            <div class="menu-item" data-action="info">
+                <i class="fas fa-info-circle"></i> Информация
+            </div>
+        `;
         
-        // Кнопка импорта данных
-        const importBtn = document.createElement('button');
-        importBtn.className = 'btn-icon';
-        importBtn.title = 'Импорт данных';
-        importBtn.innerHTML = '<i class="fas fa-upload"></i>';
-        importBtn.addEventListener('click', () => this.showImportModal());
-        document.querySelector('.sidebar-header').appendChild(importBtn);
+        // Позиционируем меню
+        menu.style.position = 'absolute';
+        menu.style.top = '60px';
+        menu.style.right = '10px';
+        menu.style.zIndex = '1000';
+        
+        document.querySelector('.sidebar').appendChild(menu);
+        
+        // Обработчики для пунктов меню
+        menu.querySelectorAll('.menu-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                const action = e.currentTarget.dataset.action;
+                menu.remove();
+                
+                switch(action) {
+                    case 'export':
+                        this.showExportModal();
+                        break;
+                    case 'import':
+                        this.showImportModal();
+                        break;
+                    case 'sync':
+                        this.syncData();
+                        break;
+                    case 'info':
+                        this.showInfo();
+                        break;
+                }
+            });
+        });
+        
+        // Закрытие меню при клике вне его
+        setTimeout(() => {
+            const closeMenu = (e) => {
+                if (!menu.contains(e.target) && e.target !== document.querySelector('.btn-icon[title="Меню"]')) {
+                    menu.remove();
+                    document.removeEventListener('click', closeMenu);
+                }
+            };
+            document.addEventListener('click', closeMenu);
+        }, 100);
+    }
+    
+    async syncData() {
+        this.showNotification('Синхронизация...');
+        const result = await this.db.syncWithGitHub();
+        this.showNotification(result.message);
+        
+        if (result.success) {
+            this.loadFriends();
+            this.loadGroups();
+            this.loadChats();
+            if (this.currentChat) {
+                this.loadMessages();
+            }
+        }
+    }
+    
+    showExportModal() {
+        const data = this.db.exportData();
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Экспорт данных</h3>
+                    <button class="btn-icon close-modal">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <p>Скопируйте этот код для переноса данных:</p>
+                    <textarea id="export-data" readonly>${data}</textarea>
+                    <button id="copy-btn" class="btn btn-primary">Копировать</button>
+                    <button id="download-btn" class="btn btn-secondary">Скачать файл</button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        // Копирование
+        modal.querySelector('#copy-btn').addEventListener('click', () => {
+            const textarea = modal.querySelector('#export-data');
+            textarea.select();
+            document.execCommand('copy');
+            this.showNotification('Скопировано!');
+        });
+        
+        // Скачивание
+        modal.querySelector('#download-btn').addEventListener('click', () => {
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'messenger_data.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+        
+        // Закрытие
+        modal.querySelector('.close-modal').addEventListener('click', () => {
+            modal.remove();
+        });
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) modal.remove();
+        });
+    }
+    
+    showImportModal() {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Импорт данных</h3>
+                    <button class="btn-icon close-modal">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <p>Вставьте JSON код или выберите файл:</p>
+                    <textarea id="import-data" placeholder="Вставьте JSON код..."></textarea>
+                    <input type="file" id="import-file" accept=".json">
+                    <div id="import-error" class="error"></div>
+                </div>
+                <div class="modal-footer">
+                    <button id="confirm-import" class="btn btn-primary">Импортировать</button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        modal.querySelector('#confirm-import').addEventListener('click', async () => {
+            const textarea = modal.querySelector('#import-data');
+            const fileInput = modal.querySelector('#import-file');
+            const errorElement = modal.querySelector('#import-error');
+            
+            let jsonString = textarea.value.trim();
+            
+            if (fileInput.files.length > 0) {
+                const file = fileInput.files[0];
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    const result = await this.db.importData(e.target.result);
+                    if (result.success) {
+                        this.showNotification(result.message);
+                        modal.remove();
+                        location.reload();
+                    } else {
+                        errorElement.textContent = result.message;
+                    }
+                };
+                reader.readAsText(file);
+            } else if (jsonString) {
+                const result = await this.db.importData(jsonString);
+                if (result.success) {
+                    this.showNotification(result.message);
+                    modal.remove();
+                    location.reload();
+                } else {
+                    errorElement.textContent = result.message;
+                }
+            } else {
+                errorElement.textContent = 'Введите данные или выберите файл';
+            }
+        });
+        
+        // Закрытие
+        modal.querySelector('.close-modal').addEventListener('click', () => {
+            modal.remove();
+        });
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) modal.remove();
+        });
+    }
+    
+    showInfo() {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Информация</h3>
+                    <button class="btn-icon close-modal">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <h4>Как работает синхронизация:</h4>
+                    <p>1. Данные хранятся в вашем браузере (localStorage)</p>
+                    <p>2. Для синхронизации между устройствами:</p>
+                    <ul>
+                        <li>Используйте кнопку "Синхронизировать"</li>
+                        <li>Или экспортируйте данные и импортируйте на другом устройстве</li>
+                    </ul>
+                    <p>3. Для облачной синхронизации добавьте GitHub токен в код</p>
+                    <p><strong>Демо-пользователи:</strong></p>
+                    <p>user1 / pass123</p>
+                    <p>user2 / pass123</p>
+                    <p>user3 / pass123</p>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        modal.querySelector('.close-modal').addEventListener('click', () => {
+            modal.remove();
+        });
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) modal.remove();
+        });
     }
     
     setupModals() {
@@ -463,163 +815,6 @@ class MessengerApp {
                     modal.classList.add('hidden');
                 }
             });
-        });
-    }
-    
-    showExportModal() {
-        const data = this.db.exportData();
-        
-        const modal = document.createElement('div');
-        modal.className = 'modal';
-        modal.innerHTML = `
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3>Экспорт данных</h3>
-                    <button class="btn-icon close-modal">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                <div class="modal-body">
-                    <p>Скопируйте этот код и сохраните его. Используйте для переноса данных на другое устройство.</p>
-                    <textarea id="export-data" readonly style="width: 100%; height: 200px; margin: 10px 0; padding: 10px; font-family: monospace;">${data}</textarea>
-                    <button id="copy-btn" class="btn btn-primary">Копировать в буфер</button>
-                    <button id="download-btn" class="btn btn-secondary" style="margin-left: 10px;">Скачать файл</button>
-                </div>
-                <div class="modal-footer">
-                    <button class="btn close-modal">Закрыть</button>
-                </div>
-            </div>
-        `;
-        
-        document.body.appendChild(modal);
-        
-        // Копирование в буфер
-        modal.querySelector('#copy-btn').addEventListener('click', () => {
-            const textarea = modal.querySelector('#export-data');
-            textarea.select();
-            document.execCommand('copy');
-            this.showNotification('Данные скопированы в буфер!');
-        });
-        
-        // Скачивание файла
-        modal.querySelector('#download-btn').addEventListener('click', () => {
-            const result = this.db.exportToFile();
-            this.showNotification(result);
-        });
-        
-        // Закрытие модального окна
-        modal.querySelector('.close-modal').addEventListener('click', () => {
-            document.body.removeChild(modal);
-        });
-        
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                document.body.removeChild(modal);
-            }
-        });
-    }
-    
-    showImportModal() {
-        const modal = document.createElement('div');
-        modal.className = 'modal';
-        modal.innerHTML = `
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3>Импорт данных</h3>
-                    <button class="btn-icon close-modal">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                <div class="modal-body">
-                    <p>Вставьте код с экспортированными данными или выберите файл:</p>
-                    <textarea id="import-data" placeholder="Вставьте JSON код здесь..." style="width: 100%; height: 150px; margin: 10px 0; padding: 10px; font-family: monospace;"></textarea>
-                    <p>Или выберите файл:</p>
-                    <input type="file" id="import-file" accept=".json" style="margin: 10px 0;">
-                    <div class="modal-error" id="import-error"></div>
-                </div>
-                <div class="modal-footer">
-                    <button class="btn close-modal">Отмена</button>
-                    <button class="btn btn-primary" id="confirm-import">Импортировать</button>
-                </div>
-            </div>
-        `;
-        
-        document.body.appendChild(modal);
-        
-        // Импорт из текста
-        modal.querySelector('#confirm-import').addEventListener('click', async () => {
-            const textarea = modal.querySelector('#import-data');
-            const fileInput = modal.querySelector('#import-file');
-            const errorElement = modal.querySelector('#import-error');
-            
-            let jsonString = textarea.value.trim();
-            
-            // Если выбран файл, читаем его
-            if (fileInput.files.length > 0) {
-                const file = fileInput.files[0];
-                if (file.type !== 'application/json' && !file.name.endsWith('.json')) {
-                    errorElement.textContent = 'Выберите JSON файл';
-                    return;
-                }
-                
-                try {
-                    const result = await this.db.importFromFile(file);
-                    if (result.success) {
-                        this.showNotification(result.message);
-                        document.body.removeChild(modal);
-                        
-                        // Обновляем интерфейс
-                        this.loadFriends();
-                        this.loadGroups();
-                        this.loadChats();
-                        
-                        // Если открыт чат, обновляем сообщения
-                        if (this.currentChat) {
-                            this.loadMessages();
-                        }
-                    } else {
-                        errorElement.textContent = result.message;
-                    }
-                } catch (error) {
-                    errorElement.textContent = 'Ошибка чтения файла: ' + error.message;
-                }
-                return;
-            }
-            
-            // Импорт из текста
-            if (!jsonString) {
-                errorElement.textContent = 'Вставьте JSON код или выберите файл';
-                return;
-            }
-            
-            const result = this.db.importData(jsonString);
-            if (result.success) {
-                this.showNotification(result.message);
-                document.body.removeChild(modal);
-                
-                // Обновляем интерфейс
-                this.loadFriends();
-                this.loadGroups();
-                this.loadChats();
-                
-                // Если открыт чат, обновляем сообщения
-                if (this.currentChat) {
-                    this.loadMessages();
-                }
-            } else {
-                errorElement.textContent = result.message;
-            }
-        });
-        
-        // Закрытие модального окна
-        modal.querySelector('.close-modal').addEventListener('click', () => {
-            document.body.removeChild(modal);
-        });
-        
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                document.body.removeChild(modal);
-            }
         });
     }
     
@@ -667,7 +862,7 @@ class MessengerApp {
         }
     }
     
-    register() {
+    async register() {
         const username = document.getElementById('register-username').value.trim();
         const password = document.getElementById('register-password').value;
         const confirmPassword = document.getElementById('register-confirm').value;
@@ -688,13 +883,18 @@ class MessengerApp {
             return;
         }
         
-        const result = this.db.addUser(username, password);
+        const result = await this.db.addUser(username, password);
         
         if (result.success) {
             this.currentUser = result.user;
             localStorage.setItem('messenger_currentUser', JSON.stringify(this.currentUser));
             this.showMainScreen();
-            this.showNotification('Регистрация успешна!');
+            
+            let message = 'Регистрация успешна!';
+            if (result.savedToCloud === false) {
+                message += ' (данные сохранены локально)';
+            }
+            this.showNotification(message);
         } else {
             errorElement.textContent = result.message;
         }
@@ -714,7 +914,7 @@ class MessengerApp {
         this.openModal('add-friend-modal');
     }
     
-    addFriend() {
+    async addFriend() {
         const friendUsername = document.getElementById('friend-username').value.trim();
         const errorElement = document.getElementById('add-friend-error');
         
@@ -723,12 +923,17 @@ class MessengerApp {
             return;
         }
         
-        const result = this.db.addFriend(this.currentUser.id, friendUsername);
+        const result = await this.db.addFriend(this.currentUser.id, friendUsername);
         
         if (result.success) {
             this.closeModal('add-friend-modal');
             this.loadFriends();
-            this.showNotification(result.message);
+            
+            let message = result.message;
+            if (result.savedToCloud === false) {
+                message += ' (данные сохранены локально)';
+            }
+            this.showNotification(message);
         } else {
             errorElement.textContent = result.message;
         }
@@ -759,7 +964,7 @@ class MessengerApp {
         this.openModal('create-group-modal');
     }
     
-    createGroup() {
+    async createGroup() {
         const groupName = document.getElementById('group-name').value.trim();
         const errorElement = document.getElementById('create-group-error');
         
@@ -776,12 +981,17 @@ class MessengerApp {
             return;
         }
         
-        const result = this.db.createGroup(groupName, this.currentUser.id, memberIds);
+        const result = await this.db.createGroup(groupName, this.currentUser.id, memberIds);
         
         if (result.success) {
             this.closeModal('create-group-modal');
             this.loadGroups();
-            this.showNotification('Группа создана!');
+            
+            let message = 'Группа создана!';
+            if (result.savedToCloud === false) {
+                message += ' (данные сохранены локально)';
+            }
+            this.showNotification(message);
             this.openChat('group', result.group.id);
         } else {
             errorElement.textContent = result.message;
@@ -1122,56 +1332,103 @@ document.addEventListener('DOMContentLoaded', () => {
     window.app = new MessengerApp();
 });
 
-// ==================== ФУНКЦИИ ДЛЯ КОНСОЛИ ====================
-
-// Экспорт данных
-window.exportData = function() {
-    const db = new SimpleDB();
-    const data = db.exportData();
-    console.log('=== КОД ДЛЯ ЭКСПОРТА ===');
-    console.log(data);
-    console.log('=======================');
-    
-    // Копируем в буфер
-    navigator.clipboard.writeText(data).then(() => {
-        alert('Данные скопированы в буфер! Вставьте их на другом устройстве.');
-    }).catch(err => {
-        alert('Скопируйте текст из консоли (F12)');
-    });
-    
-    return data;
-};
-
-// Импорт данных
-window.importData = function(jsonString) {
-    const db = new SimpleDB();
-    const result = db.importData(jsonString);
-    alert(result.message);
-    if (result.success) {
-        location.reload();
+// ==================== ДОБАВЛЯЕМ СТИЛИ ДЛЯ НОВЫХ ЭЛЕМЕНТОВ ====================
+const extraStyles = `
+<style>
+    /* Меню пользователя */
+    .user-menu {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+        min-width: 200px;
+        overflow: hidden;
     }
-};
-
-// Показать информацию о данных
-window.showDataInfo = function() {
-    const db = new SimpleDB();
-    const data = db.getAllData();
     
-    console.log('=== ИНФОРМАЦИЯ О ДАННЫХ ===');
-    console.log('Пользователей:', data.users.length);
-    console.log('Дружеских связей:', data.friendships.length);
-    console.log('Групп:', data.groups.length);
-    console.log('Сообщений:', data.messages.length);
-    console.log('===========================');
-    
-    return data;
-};
-
-// Сброс данных
-window.resetData = function() {
-    if (confirm('Сбросить все данные? Восстановить будет нельзя.')) {
-        localStorage.clear();
-        alert('Данные сброшены. Страница перезагрузится.');
-        location.reload();
+    .menu-item {
+        padding: 12px 16px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        transition: background 0.2s;
     }
-};
+    
+    .menu-item:hover {
+        background: #f5f5f5;
+    }
+    
+    .menu-item i {
+        width: 20px;
+        color: #666;
+    }
+    
+    /* Статус синхронизации */
+    .sync-status {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 12px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        margin: 10px 20px;
+        font-size: 12px;
+    }
+    
+    .sync-status span {
+        color: #666;
+    }
+    
+    .btn-icon.small {
+        width: 28px;
+        height: 28px;
+        font-size: 14px;
+    }
+    
+    /* Текстовые поля в модалках */
+    textarea {
+        width: 100%;
+        height: 150px;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        font-family: monospace;
+        font-size: 12px;
+        resize: vertical;
+        margin: 10px 0;
+    }
+    
+    /* Адаптивность для телефона */
+    @media (max-width: 768px) {
+        .sidebar {
+            width: 100%;
+        }
+        
+        .user-menu {
+            position: fixed !important;
+            top: 70px;
+            right: 10px;
+            left: 10px;
+            z-index: 10000;
+        }
+        
+        .sync-status {
+            margin: 10px;
+        }
+        
+        .modal-content {
+            width: 95%;
+            max-height: 80vh;
+        }
+    }
+    
+    /* Индикатор состояния */
+    .error {
+        color: #ff4444;
+        margin-top: 10px;
+        font-size: 14px;
+    }
+</style>
+`;
+
+// Добавляем стили в документ
+document.head.insertAdjacentHTML('beforeend', extraStyles);
